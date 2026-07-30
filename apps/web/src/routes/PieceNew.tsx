@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { suggestChildKind } from '@marble/core'
 import type { CreatePieceInput } from '@marble/core'
 import { errorMessage } from '../data'
-import { useCreatePiece, useKnownLocations, usePieces } from '../hooks/usePieces'
+import { useCreatePiece, useKnownLocations, usePieces, useSetPhoto } from '../hooks/usePieces'
 import { useMaterials } from '../hooks/useMaterials'
 import { PieceForm } from '../components/PieceForm'
 import { Alert, Loading, PageHeader } from '../components/ui'
@@ -12,11 +12,14 @@ export function PieceNew() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+  // Held here until the piece exists — a photo needs an id to be stored against.
+  const [photo, setPhoto] = useState<string | null>(null)
 
   const { data: allPieces, isLoading } = usePieces()
   const { data: materials } = useMaterials()
   const { data: locations } = useKnownLocations()
   const createPiece = useCreatePiece()
+  const setPiecePhoto = useSetPhoto()
 
   if (isLoading) return <Loading />
 
@@ -40,12 +43,32 @@ export function PieceNew() {
 
   async function handleSubmit(values: CreatePieceInput) {
     setError(null)
+
+    let created
     try {
-      const created = await createPiece.mutateAsync(values)
-      navigate(`/pieces/${created.id}`, { replace: true })
+      created = await createPiece.mutateAsync(values)
     } catch (caught) {
       setError(errorMessage(caught))
+      return
     }
+
+    // The piece is saved from here on. If attaching the photo fails (storage quota is the
+    // realistic cause) we must still move on — leaving the user on the form would invite a
+    // resubmit and a duplicate piece. Carry the reason through so the detail page can explain
+    // it and offer a retry.
+    if (photo) {
+      try {
+        await setPiecePhoto.mutateAsync({ id: created.id, dataUrl: photo })
+      } catch (caught) {
+        navigate(`/pieces/${created.id}`, {
+          replace: true,
+          state: { photoError: errorMessage(caught) },
+        })
+        return
+      }
+    }
+
+    navigate(`/pieces/${created.id}`, { replace: true })
   }
 
   return (
@@ -78,9 +101,11 @@ export function PieceNew() {
         materials={materials ?? []}
         locations={locations ?? []}
         excludeIds={new Set()}
+        photo={photo}
+        onPhotoChange={setPhoto}
         onSubmit={handleSubmit}
         onCancel={() => navigate(-1)}
-        submitting={createPiece.isPending}
+        submitting={createPiece.isPending || setPiecePhoto.isPending}
         error={error}
         submitLabel="Save piece"
       />

@@ -74,6 +74,27 @@ describe('signed-in routes', () => {
     expect(await screen.findByLabelText('Length (mm)')).toBeInTheDocument()
   })
 
+  it('offers a photo control while creating a piece', async () => {
+    renderApp('/pieces/new')
+    expect(await screen.findByText('Photo')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Add photo/ })).toBeInTheDocument()
+  })
+
+  it('offers the photo control when cutting from a parent too', async () => {
+    const slab = pieces.find((p) => p.code === 'SLB-0001') as Piece
+    renderApp(`/pieces/new?parentId=${slab.id}`)
+    expect(await screen.findByRole('button', { name: /Add photo/ })).toBeInTheDocument()
+  })
+
+  it('does not show the photo control on the edit form', async () => {
+    // Photos on an existing piece are managed from its detail page, which writes through
+    // immediately rather than waiting for a save.
+    const remnant = pieces.find((p) => p.code === 'RMN-0001') as Piece
+    renderApp(`/pieces/${remnant.id}/edit`)
+    await screen.findByRole('heading', { name: 'Edit RMN-0001' })
+    expect(screen.queryByRole('button', { name: /Add photo/ })).not.toBeInTheDocument()
+  })
+
   it('prefills the source when cutting from a piece', async () => {
     const slab = pieces.find((p) => p.code === 'SLB-0001') as Piece
     renderApp(`/pieces/new?parentId=${slab.id}`)

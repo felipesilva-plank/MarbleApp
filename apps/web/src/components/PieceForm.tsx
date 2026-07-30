@@ -11,6 +11,7 @@ import {
 } from '@marble/core'
 import type { CreatePieceInput, Material, Piece } from '@marble/core'
 import { ParentPicker } from './ParentPicker'
+import { PhotoPicker } from './PhotoPicker'
 import { Alert, Button, Card, Field, Input, Select, SectionTitle, Spinner, Textarea } from './ui'
 
 export function PieceForm({
@@ -20,6 +21,8 @@ export function PieceForm({
   materials,
   locations,
   excludeIds,
+  photo,
+  onPhotoChange,
   onSubmit,
   onCancel,
   submitting,
@@ -32,6 +35,9 @@ export function PieceForm({
   materials: Material[]
   locations: string[]
   excludeIds?: Set<string>
+  /** Held in the parent's state until the piece exists and the photo can be attached to it. */
+  photo?: string | null
+  onPhotoChange?: (dataUrl: string | null) => void
   onSubmit: (values: CreatePieceInput) => void | Promise<void>
   onCancel: () => void
   submitting: boolean
@@ -150,6 +156,24 @@ export function PieceForm({
           </span>
         </p>
       </Card>
+
+      {onPhotoChange ? (
+        <Card className="p-5">
+          <SectionTitle>Photo</SectionTitle>
+          <p className="mb-3 text-sm text-stone-600">
+            Optional, and the fastest way to recognise this piece later — remnant hunting is
+            mostly visual.
+          </p>
+          <div className="max-w-sm">
+            <PhotoPicker
+              value={photo ?? null}
+              onChange={onPhotoChange}
+              disabled={submitting}
+              emptyHint="No photo yet"
+            />
+          </div>
+        </Card>
+      ) : null}
 
       <Card className="p-5">
         <SectionTitle>Storage</SectionTitle>

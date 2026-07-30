@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import {
   PIECE_STATUSES,
   PIECE_STATUS_LABELS,
@@ -53,6 +53,10 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 export function PieceDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Set when the piece saved but its photo did not — see the create flow in PieceNew.
+  const photoError = (location.state as { photoError?: string } | null)?.photoError ?? null
 
   const { data: piece, isLoading } = usePiece(id)
   const { data: allPieces } = usePieces()
@@ -161,6 +165,15 @@ export function PieceDetail() {
       {error ? (
         <div className="mb-6">
           <Alert>{error}</Alert>
+        </div>
+      ) : null}
+
+      {photoError ? (
+        <div className="mb-6">
+          <Alert tone="warning">
+            {piece.code} was saved, but its photo could not be attached: {photoError} You can try
+            again below.
+          </Alert>
         </div>
       ) : null}
 
