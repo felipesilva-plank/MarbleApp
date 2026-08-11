@@ -1,0 +1,20 @@
+{
+  "name": "marbleapp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @marble/web",
+    "build": "npm run build --workspace @marble/web",
+    "preview": "npm run preview --workspace @marble/web",
+    "test": "npm run test --workspace @marble/core && npm run test --workspace @marble/web",
+    "typecheck": "npm run typecheck --workspace @marble/core && npm run typecheck --workspace @marble/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
