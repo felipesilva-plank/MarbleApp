@@ -1,0 +1,14 @@
+# Default owner for everything.
+*                           @felipesilva-plank
+
+# The migration seam and the domain package are the two places where a careless
+# change is expensive later - they are what makes swapping in the API a
+# one-file edit. Flag them explicitly.
+/packages/core/             @felipesilva-plank
+/apps/web/src/data/ports.ts @felipesilva-plank
+/apps/web/src/data/index.ts @felipesilva-plank
+
+# Agent behaviour and CI are team-wide config, not personal preference.
+/.claude/                   @felipesilva-plank
+/.github/                   @felipesilva-plank
+/CLAUDE.md                  @felipesilva-plank
