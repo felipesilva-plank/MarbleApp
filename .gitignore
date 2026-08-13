@@ -143,6 +143,8 @@ vite.config.ts.timestamp-*
 .vite/
 .vercel
 .env*
+# ...but the template of required names is the point of having one.
+!.env.example
 
 # Claude Code — personal overrides stay local, team settings are committed
 .claude/settings.local.json

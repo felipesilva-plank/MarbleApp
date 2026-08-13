@@ -12,7 +12,8 @@
     "build": "npm run build --workspace @marble/web",
     "preview": "npm run preview --workspace @marble/web",
     "test": "npm run test --workspace @marble/core && npm run test --workspace @marble/web",
-    "typecheck": "npm run typecheck --workspace @marble/core && npm run typecheck --workspace @marble/web"
+    "typecheck": "npm run typecheck --workspace @marble/core && npm run typecheck --workspace @marble/web",
+    "pre-deploy": "node scripts/pre-deploy.mjs"
   },
   "engines": {
     "node": ">=20"
