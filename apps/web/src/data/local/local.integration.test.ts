@@ -306,9 +306,11 @@ describe('the block → slab → remnant walk', () => {
   })
 
   it('strips params that are not filters, so a view switch is not a preset', async () => {
+    // VALIDATION rather than DUPLICATE: asserting only `instanceof DomainError` let the wrong
+    // code through, and the code is what becomes an HTTP status.
     await expect(
       presetsRepo.create({ name: 'Grid only', query: 'view=grid' }),
-    ).rejects.toBeInstanceOf(DomainError)
+    ).rejects.toMatchObject({ code: 'VALIDATION' })
     expect(await presetsRepo.list()).toHaveLength(0)
   })
 

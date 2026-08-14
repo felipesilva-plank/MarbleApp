@@ -24,7 +24,9 @@ export const localPresetRepository: PresetRepository = {
     const query = normalizeQuery(parsed.query)
 
     if (query.length === 0) {
-      throw new DomainError('DUPLICATE', 'Set at least one filter before saving a preset.')
+      // VALIDATION, not DUPLICATE: nothing conflicts, the input is just empty. These map to 400
+      // and 409 respectively once the API exists.
+      throw new DomainError('VALIDATION', 'Set at least one filter before saving a preset.')
     }
 
     const presets = readPresets()
