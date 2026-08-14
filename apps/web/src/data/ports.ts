@@ -1,5 +1,7 @@
 import type {
   CreatePieceInput,
+  FilterPreset,
+  FilterPresetInput,
   LoginInput,
   Material,
   MaterialInput,
@@ -25,6 +27,10 @@ import type {
  *   assignParent  PUT    /api/pieces/:id/parent      { parentId }
  *   remove        DELETE /api/pieces/:id?orphanChildren=true
  *   setPhoto      PUT    /api/pieces/:id/photo       (multipart)
+ *
+ *   presets.list    GET    /api/presets
+ *   presets.create  POST   /api/presets                { name, query }
+ *   presets.remove  DELETE /api/presets/:id
  *
  * Every method is async even though the local implementation is synchronous, so that swapping in
  * `fetch` changes nothing above this file — including loading and error states, which already
@@ -54,6 +60,17 @@ export interface MaterialRepository {
   get(id: string): Promise<Material | null>
   create(input: MaterialInput): Promise<Material>
   update(id: string, input: Partial<MaterialInput>): Promise<Material>
+  remove(id: string): Promise<void>
+}
+
+/**
+ * Saved filters for the piece list. Stores the query string rather than a parsed filter object -
+ * the URL is already the source of truth, and a second representation would be two things to keep
+ * in sync plus a migration every time a filter param is added.
+ */
+export interface PresetRepository {
+  list(): Promise<FilterPreset[]>
+  create(input: FilterPresetInput): Promise<FilterPreset>
   remove(id: string): Promise<void>
 }
 

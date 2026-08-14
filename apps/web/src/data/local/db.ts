@@ -14,6 +14,7 @@ export const KEYS = {
   pieces: `${NS}.pieces`,
   materials: `${NS}.materials`,
   counters: `${NS}.counters`,
+  presets: `${NS}.presets`,
   seeded: `${NS}.seeded`,
 } as const
 
