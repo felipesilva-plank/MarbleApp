@@ -11,12 +11,15 @@ import {
   isUnlinked,
 } from '@marble/core'
 import type { PieceFilter, PieceKind, PieceStatus } from '@marble/core'
+import { toCsvFile } from '@marble/core'
 import type { FilterPreset } from '@marble/core'
 import { errorMessage } from '../data'
 import { usePieces } from '../hooks/usePieces'
 import { useMaterialMap, useMaterials } from '../hooks/useMaterials'
 import { useCreatePreset, useDeletePreset, usePresets } from '../hooks/usePresets'
 import { formatRelative } from '../lib/format'
+import { downloadText } from '../lib/download'
+import { pieceCsvColumns, pieceCsvLookups } from '../lib/pieceCsv'
 import { PresetBar } from '../components/PresetBar'
 import { KindBadge, OrphanBadge, StatusBadge } from '../components/badges'
 import { PieceThumb } from '../components/PieceThumb'
@@ -62,6 +65,10 @@ export function PieceList() {
   const { data: pieces, isLoading } = usePieces(filter)
   const results = pieces ?? []
 
+  // Unfiltered, for the CSV's "Cut from" column: a parent is usually outside the current filter.
+  // Same query key as any other unfiltered list, so this is a cache hit in practice.
+  const { data: everyPiece } = usePieces()
+
   const { data: presets } = usePresets()
   const createPreset = useCreatePreset()
   const deletePreset = useDeletePreset()
@@ -84,6 +91,13 @@ export function PieceList() {
     } catch (caught) {
       setPresetError(errorMessage(caught))
     }
+  }
+
+  function exportCsv() {
+    const lookups = pieceCsvLookups(everyPiece ?? results, materials ?? [])
+    const csv = toCsvFile(results, pieceCsvColumns(lookups.materialName, lookups.codeOf))
+    const stamp = new Date().toISOString().slice(0, 10)
+    downloadText(`marbleapp-pieces-${stamp}.csv`, csv, 'text/csv;charset=utf-8')
   }
 
   async function removePreset(preset: FilterPreset) {
@@ -134,6 +148,9 @@ export function PieceList() {
                 </button>
               ))}
             </div>
+            <Button onClick={exportCsv} disabled={results.length === 0}>
+              Export CSV
+            </Button>
             <Link to="/pieces/new">
               <Button variant="primary">Add a piece</Button>
             </Link>
