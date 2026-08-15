@@ -27,19 +27,38 @@ export function PieceNew() {
   const requestedParentId = params.get('parentId')
   const parent = pieces.find((p) => p.id === requestedParentId) ?? null
 
-  // A piece cut from a parent inherits its material, thickness and shelf by default — it is
-  // literally the same stone. The user can still change any of it.
-  const defaultValues: CreatePieceInput = {
-    kind: parent ? suggestChildKind(parent.kind) : 'slab',
-    status: 'available',
-    parentId: parent?.id ?? null,
-    materialId: parent?.materialId ?? null,
-    lengthMm: '' as unknown as number,
-    widthMm: '' as unknown as number,
-    thicknessMm: parent?.thicknessMm ?? ('' as unknown as number),
-    location: parent?.location ?? '',
-    notes: '',
-  }
+  // Duplicating copies everything the user typed and nothing the system owns: no id, no code, no
+  // photo. The SOURCE's parent is carried over, not the source itself - two slabs sawn from the
+  // same block are siblings, and making the copy a child of the original would record a cut that
+  // never happened.
+  const requestedDuplicateId = params.get('duplicateOf')
+  const source = pieces.find((p) => p.id === requestedDuplicateId) ?? null
+
+  const defaultValues: CreatePieceInput = source
+    ? {
+        kind: source.kind,
+        status: source.status,
+        parentId: source.parentId,
+        materialId: source.materialId,
+        lengthMm: source.lengthMm,
+        widthMm: source.widthMm,
+        thicknessMm: source.thicknessMm,
+        location: source.location,
+        notes: source.notes,
+      }
+    : {
+        // A piece cut from a parent inherits its material, thickness and shelf by default — it is
+        // literally the same stone. The user can still change any of it.
+        kind: parent ? suggestChildKind(parent.kind) : 'slab',
+        status: 'available',
+        parentId: parent?.id ?? null,
+        materialId: parent?.materialId ?? null,
+        lengthMm: '' as unknown as number,
+        widthMm: '' as unknown as number,
+        thicknessMm: parent?.thicknessMm ?? ('' as unknown as number),
+        location: parent?.location ?? '',
+        notes: '',
+      }
 
   async function handleSubmit(values: CreatePieceInput) {
     setError(null)
@@ -74,13 +93,33 @@ export function PieceNew() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title={parent ? `Cut a piece from ${parent.code}` : 'Add a piece'}
+        title={
+          source
+            ? `Duplicate of ${source.code}`
+            : parent
+              ? `Cut a piece from ${parent.code}`
+              : 'Add a piece'
+        }
         subtitle={
-          parent
-            ? 'The new piece will permanently record where it came from.'
-            : 'Register stone that arrived from a supplier or quarry, or a piece whose origin you will link later.'
+          source
+            ? 'Everything is copied except the code and the photo. It gets its own code on save.'
+            : parent
+              ? 'The new piece will permanently record where it came from.'
+              : 'Register stone that arrived from a supplier or quarry, or a piece whose origin you will link later.'
         }
       />
+
+      {requestedDuplicateId && !source ? (
+        <div className="mb-6">
+          <Alert tone="warning">
+            The piece you asked to duplicate no longer exists. This form is blank — fill it in, or{' '}
+            <Link to="/pieces" className="underline underline-offset-2">
+              go back to the list
+            </Link>
+            .
+          </Alert>
+        </div>
+      ) : null}
 
       {requestedParentId && !parent ? (
         <div className="mb-6">
