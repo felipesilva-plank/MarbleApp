@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { suggestChildKind } from '@marble/core'
 import type { CreatePieceInput } from '@marble/core'
-import { errorMessage } from '../data'
+import { errorMessage, isDomainError } from '../data'
 import { useCreatePiece, useKnownLocations, usePieces, useSetPhoto } from '../hooks/usePieces'
 import { useMaterials } from '../hooks/useMaterials'
+import { capture } from '../lib/analytics'
 import { PieceForm } from '../components/PieceForm'
 import { Alert, Loading, PageHeader } from '../components/ui'
 
@@ -71,6 +72,18 @@ export function PieceNew() {
       return
     }
 
+    capture('piece_created', {
+      kind: created.kind,
+      has_parent: created.parentId !== null,
+      has_photo: photo !== null,
+      from_duplicate: source !== null,
+    })
+
+    if (created.parentId !== null) {
+      // subtree_size is 0 here by construction: a piece created with a parent has no children yet.
+      capture('piece_parent_assigned', { via: 'create', subtree_size: 0 })
+    }
+
     // The piece is saved from here on. If attaching the photo fails (storage quota is the
     // realistic cause) we must still move on — leaving the user on the form would invite a
     // resubmit and a duplicate piece. Carry the reason through so the detail page can explain
@@ -79,6 +92,9 @@ export function PieceNew() {
       try {
         await setPiecePhoto.mutateAsync({ id: created.id, dataUrl: photo })
       } catch (caught) {
+        if (isDomainError(caught) && caught.code === 'QUOTA') {
+          capture('storage_quota_hit', { where: 'piece_photo_on_create' })
+        }
         navigate(`/pieces/${created.id}`, {
           replace: true,
           state: { photoError: errorMessage(caught) },
