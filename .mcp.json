@@ -15,6 +15,15 @@
     "figma": {
       "type": "sse",
       "url": "http://127.0.0.1:3845/sse"
+    },
+    "marble-inventory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "tsx",
+        "packages/mcp-inventory/src/cli/server.ts",
+        "packages/mcp-inventory/marble.db"
+      ]
     }
   }
 }
