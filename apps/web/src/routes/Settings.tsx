@@ -86,9 +86,12 @@ export function Settings() {
     setBusy(true)
     setError(null)
     try {
-      await backup.importAll(pendingImport)
+      // The count comes from importAll, not from `pieces`: that is captured from the render
+      // closure and still holds the PRE-import inventory, so a fresh browser restoring 500 pieces
+      // reported 0 - which is exactly the number this event exists to answer.
+      const restored = await backup.importAll(pendingImport)
       await queryClient.invalidateQueries()
-      capture('backup_imported', { piece_count: pieces?.length ?? 0 })
+      capture('backup_imported', { piece_count: restored.pieces })
       setNotice('Backup restored.')
       setPendingImport(null)
     } catch (caught) {

@@ -350,4 +350,11 @@ describe('the block → slab → remnant walk', () => {
   it('refuses to delete a preset that is already gone', async () => {
     await expect(presetsRepo.remove('nope')).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
+
+  it('reports what was restored, since the caller\'s cached counts are stale by then', async () => {
+    const dump = await localBackupPort.exportAll()
+    localStorage.setItem('marble.v1.pieces', '[]')
+
+    expect(await localBackupPort.importAll(dump)).toEqual({ pieces: 4, materials: 1 })
+  })
 })
