@@ -1,3 +1,5 @@
+import { rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { createSchema, openDb } from './db.js'
 import type { InventoryDb } from './db.js'
@@ -136,5 +138,52 @@ describe('runQuery', () => {
   it('leaves the data untouched when a write is attempted', () => {
     expect(() => runQuery(db, "DELETE FROM pieces WHERE code = 'RMN-0001'")).toThrow(QueryRejected)
     expect(runQuery(db, 'SELECT COUNT(*) AS n FROM pieces').rows[0]).toEqual({ n: 12 })
+  })
+})
+
+describe('stripLiterals scanning order', () => {
+  /**
+   * Regression: stripping string literals before comments let a quote inside a `--` comment pair
+   * with a quote on a later line, blanking the semicolon and verb between them.
+   */
+  it('does not let a quote inside a comment swallow the statement that follows', () => {
+    const attack = "SELECT 1 ) LIMIT 1 --'\n; DROP TABLE pieces --'"
+    expect(stripLiterals(attack)).toContain(';')
+    expect(() => assertReadOnly(attack)).toThrow(QueryRejected)
+  })
+
+  it('still ignores a keyword inside a genuine literal', () => {
+    expect(() =>
+      assertReadOnly("SELECT * FROM pieces WHERE notes = 'drop table pieces'"),
+    ).not.toThrow()
+  })
+
+  it('handles an escaped quote inside a literal without losing the rest', () => {
+    expect(() => assertReadOnly("SELECT * FROM pieces WHERE notes = 'it''s fine'")).not.toThrow()
+    // The verb check fires before the statement-count check, so this is a DROP rejection.
+    expect(() => assertReadOnly("SELECT 'a''b'; DROP TABLE pieces")).toThrow(/DROP is not allowed/)
+    expect(() => assertReadOnly("SELECT 'a''b'; SELECT 2")).toThrow(/One statement/)
+  })
+
+  it('blanks a block comment without joining the code either side into one token', () => {
+    expect(stripLiterals('SELECT/**/1').replace(/\s+/g, ' ')).toBe('SELECT 1')
+  })
+})
+
+describe('read-only connection', () => {
+  it('refuses a write even when the SQL guard is bypassed entirely', () => {
+    const path = `${tmpdir()}/marble-readonly-${process.pid}.db`
+    rmSync(path, { force: true })
+
+    const writable = openDb(path)
+    createSchema(writable)
+    writable.close()
+
+    const readonly = openDb(path, { readOnly: true })
+    // db.exec is the guard-free path the server never exposes - this is the second line of defence.
+    expect(() => readonly.exec("INSERT INTO materials (id, org_id, name, created_at) VALUES ('a','b','c','d')")).toThrow()
+    expect(readonly.all('SELECT COUNT(*) AS n FROM materials')[0]).toEqual({ n: 0 })
+    readonly.close()
+    rmSync(path, { force: true })
   })
 })

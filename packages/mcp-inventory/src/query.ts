@@ -19,13 +19,63 @@ export const MAX_ROWS = 500
 
 export class QueryRejected extends Error {}
 
-/** Strips string literals and comments so a piece note containing the word "delete" is not a hit. */
+/**
+ * Blanks string literals and comments so a piece note containing the word "delete" is not a hit.
+ *
+ * ONE left-to-right scan, not a sequence of regex passes. Stripping literals first let a quote
+ * inside a `--` comment pair with a quote on a later line, and the regex then swallowed everything
+ * between them - including a semicolon and a forbidden verb. This got through:
+ *
+ *     SELECT 1 ) LIMIT 1 --'
+ *     ; DROP TABLE pieces --'
+ *
+ * A scanner cannot have that bug, because at every character it knows which construct it is
+ * inside.
+ */
 export function stripLiterals(sql: string): string {
-  return sql
-    .replace(/'(?:[^']|'')*'/g, "''")
-    .replace(/"(?:[^"]|"")*"/g, '""')
-    .replace(/--[^\n]*/g, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+  let out = ''
+  let i = 0
+
+  while (i < sql.length) {
+    const char = sql[i]
+    const next = sql[i + 1]
+
+    if (char === "'" || char === '"') {
+      const quote = char
+      out += quote + quote
+      i += 1
+      while (i < sql.length) {
+        if (sql[i] === quote) {
+          // A doubled quote is an escaped quote, not the end of the literal.
+          if (sql[i + 1] === quote) i += 2
+          else {
+            i += 1
+            break
+          }
+        } else i += 1
+      }
+      continue
+    }
+
+    if (char === '-' && next === '-') {
+      while (i < sql.length && sql[i] !== '\n') i += 1
+      out += ' '
+      continue
+    }
+
+    if (char === '/' && next === '*') {
+      i += 2
+      while (i < sql.length && !(sql[i] === '*' && sql[i + 1] === '/')) i += 1
+      i += 2
+      out += ' '
+      continue
+    }
+
+    out += char
+    i += 1
+  }
+
+  return out
 }
 
 export function assertReadOnly(sql: string): void {

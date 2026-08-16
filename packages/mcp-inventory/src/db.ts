@@ -16,8 +16,17 @@ export interface InventoryDb {
   close(): void
 }
 
-export function openDb(path: string): InventoryDb {
-  const db = new DatabaseSync(path)
+export interface OpenOptions {
+  /**
+   * Defence in depth. The server opens read-only so that a bypass of the SQL guard still cannot
+   * write - the guard exists to give the MODEL a clear refusal, not to be the only thing stopping
+   * a write. Seeding needs it false.
+   */
+  readOnly?: boolean
+}
+
+export function openDb(path: string, options: OpenOptions = {}): InventoryDb {
+  const db = new DatabaseSync(path, options.readOnly ? { readOnly: true } : {})
   // Enforce the parent_id/material_id references. Off by default in SQLite, which is how dangling
   // foreign keys quietly accumulate.
   db.exec('PRAGMA foreign_keys = ON')

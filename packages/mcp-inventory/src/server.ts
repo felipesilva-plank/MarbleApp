@@ -137,6 +137,7 @@ export function createServer(db: InventoryDb): McpServer {
 }
 
 export function createServerFromPath(dbPath: string): { server: McpServer; db: InventoryDb } {
-  const db = openDb(dbPath)
+  // read-only at the connection as well as in the guard; see OpenOptions.
+  const db = openDb(dbPath, { readOnly: true })
   return { server: createServer(db), db }
 }
