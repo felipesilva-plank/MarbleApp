@@ -11,8 +11,8 @@
     "dev": "npm run dev --workspace @marble/web",
     "build": "npm run build --workspace @marble/web",
     "preview": "npm run preview --workspace @marble/web",
-    "test": "npm run test --workspace @marble/core && npm run test --workspace @marble/web && npm run test --workspace @marble/mcp-inventory",
-    "typecheck": "npm run typecheck --workspace @marble/core && npm run typecheck --workspace @marble/web && npm run typecheck --workspace @marble/mcp-inventory",
+    "test": "npm run test --workspace @marble/core && npm run test --workspace @marble/web && npm run test --workspace @marble/mcp-inventory && npm run test --workspace @marble/mcp-posthog",
+    "typecheck": "npm run typecheck --workspace @marble/core && npm run typecheck --workspace @marble/web && npm run typecheck --workspace @marble/mcp-inventory && npm run typecheck --workspace @marble/mcp-posthog",
     "pre-deploy": "node scripts/pre-deploy.mjs"
   },
   "engines": {

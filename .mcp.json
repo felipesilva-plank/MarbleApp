@@ -24,6 +24,18 @@
         "packages/mcp-inventory/src/cli/server.ts",
         "packages/mcp-inventory/marble.db"
       ]
+    },
+    "marble-posthog": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "tsx",
+        "packages/mcp-posthog/src/cli/server.ts"
+      ],
+      "env": {
+        "POSTHOG_API_KEY": "${POSTHOG_API_KEY}",
+        "POSTHOG_PROJECT_ID": "${POSTHOG_PROJECT_ID}"
+      }
     }
   }
 }
