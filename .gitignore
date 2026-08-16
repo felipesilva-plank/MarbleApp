@@ -149,3 +149,6 @@ vite.config.ts.timestamp-*
 # Claude Code — personal overrides stay local, team settings are committed
 .claude/settings.local.json
 .claude/worktrees/
+
+# MCP inventory snapshot - a disposable read model, rebuilt from a backup export
+packages/mcp-inventory/*.db
