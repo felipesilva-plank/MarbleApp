@@ -1,3 +1,6 @@
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { MarbleClient, MissingApiKeyError } from './client.js'
 import { addUsage, costUsd, EMPTY_USAGE, formatTokens, formatUsd, MODELS, resolveModel } from './models.js'
@@ -64,10 +67,28 @@ describe('MarbleClient', () => {
   it('refuses to construct without a key, and says where to put one', () => {
     const previous = process.env.ANTHROPIC_API_KEY
     delete process.env.ANTHROPIC_API_KEY
+    // envPath points nowhere on purpose: without it this passes or fails depending on whether the
+    // machine running the suite happens to have a .env.local, which it did.
+    const options = { envPath: '/nonexistent/.env.local' }
     try {
-      expect(() => new MarbleClient()).toThrow(MissingApiKeyError)
-      expect(() => new MarbleClient()).toThrow(/\.env\.local/)
+      expect(() => new MarbleClient(options)).toThrow(MissingApiKeyError)
+      expect(() => new MarbleClient(options)).toThrow(/\.env\.local/)
     } finally {
+      if (previous !== undefined) process.env.ANTHROPIC_API_KEY = previous
+    }
+  })
+
+  it('picks the key up from .env.local when it is not exported', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'marble-client-env-'))
+    const envPath = join(dir, '.env.local')
+    await writeFile(envPath, 'ANTHROPIC_API_KEY=sk-ant-from-file\n', 'utf8')
+
+    const previous = process.env.ANTHROPIC_API_KEY
+    delete process.env.ANTHROPIC_API_KEY
+    try {
+      expect(() => new MarbleClient({ envPath })).not.toThrow()
+    } finally {
+      delete process.env.ANTHROPIC_API_KEY
       if (previous !== undefined) process.env.ANTHROPIC_API_KEY = previous
     }
   })

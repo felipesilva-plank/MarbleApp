@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { loadLocalEnv } from './env.js'
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages'
 import { addUsage, costUsd, EMPTY_USAGE, resolveModel } from './models.js'
 import type { ModelSpec, Usage } from './models.js'
@@ -39,6 +40,12 @@ export interface ClientOptions {
   defaultModel?: string
   /** Injected in tests. Anything with a `messages` surface the calls below use. */
   anthropic?: Pick<Anthropic, 'messages'>
+  /**
+   * Where to look for .env.local. Overridable so the missing-key test is not at the mercy of
+   * whether the developer running it happens to have one on disk - it failed exactly that way
+   * once.
+   */
+  envPath?: string
 }
 
 export class MissingApiKeyError extends Error {
@@ -63,6 +70,9 @@ export class MarbleClient {
     if (options.anthropic) {
       this.anthropic = options.anthropic
     } else {
+      // Loaded here rather than at import time so a caller that injects a client never touches
+      // the filesystem, which keeps the tests hermetic.
+      loadLocalEnv(options.envPath)
       const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY
       if (!apiKey) throw new MissingApiKeyError()
       // maxRetries 0: retries are handled by withRetry so they can be narrated to the user.
