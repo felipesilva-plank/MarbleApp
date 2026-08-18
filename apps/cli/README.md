@@ -31,9 +31,56 @@ Trailing words are sent as a first message; the REPL continues from there.
 | `/system [text\|reset\|none]` | Show, replace, restore, or remove. |
 | `/cost` | Tokens and spend, broken down per model. |
 | `/clear` | Forget the conversation, keep the settings. |
+| `/limits [turns] [cost]` | Agent-loop guards: max tool-use turns, max USD per question. |
+| `/research <topic>` | The four-step chain below. |
 | `/help`, `/exit` | — |
 
 Ctrl-C cancels a streaming reply without killing the session. Ctrl-D exits.
+
+## Tools
+
+`web_search`, `read_url`, `calculator`, `save_note`, `list_notes`. The model calls them in a loop
+until it answers; calls within one turn run concurrently.
+
+**The calculator is a parser, not `eval`.** The expression is composed by a model that may be
+echoing something off a web page, so `eval` there is arbitrary code execution with extra steps. It
+is ~90 lines and the tests assert that `process.exit(1)` and `require("fs")` are *parse errors*.
+
+**Tool errors are written for the model to act on.** "No results for X. Try fewer words, drop any
+quotes, or search for a broader term." recovers the turn; "Error: 404" does not.
+
+**`save_note` is the only tool that writes, so it is the only one that asks.** Declining returns a
+message telling the model not to ask again — otherwise it retries the same call.
+
+Guards: 15 turns and $1 per question by default, both settable with `/limits`. The cost check runs
+*before* each request — finding out you overspent after the fact is a receipt, not a limit.
+
+## `/research <topic>`
+
+A four-step chain rather than the agent loop, because the shape of the work is known up front:
+
+| Step | Model | Does |
+| --- | --- | --- |
+| 1 | Haiku | Turn the topic into 3 distinct search queries |
+| 2 | Haiku | Run them concurrently, dedupe results by URL |
+| 3 | Sonnet | Read the top N pages, extract only what is relevant |
+| 4 | Sonnet | Synthesise a cited markdown report |
+
+Three things the chain buys that an agent loop cannot:
+
+- **Model routing.** Steps 1–2 are mechanical, so Haiku does them at a fifth of the price. On a
+  typical run that is most of the saving, and `/research` prints the per-step breakdown so the
+  claim is checkable rather than asserted.
+- **Bounded cost.** Exactly three queries, exactly N reads. An agent can decide to search eleven
+  more times.
+- **Failure isolation.** An unreachable page degrades the report and is *named* in the output; in
+  an agent loop it becomes a retry that eats the turn budget.
+
+The trade: it cannot adapt. A topic needing a fifth step does not get one — which is exactly when
+the agent loop is the better tool.
+
+Deduping by URL matters more than it looks: a page ranking for two queries would otherwise be read
+twice, and reading is the expensive step.
 
 ## Notes worth knowing
 
