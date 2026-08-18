@@ -96,7 +96,13 @@ export function htmlToText(html: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+    // Left as-is when out of range: fromCodePoint THROWS a RangeError above 0x10FFFF, which is not
+    // a ToolError, so one malformed entity on a page killed the whole read - and research() then
+    // recorded the source as unreachable and dropped it.
+    .replace(/&#(\d+);/g, (match, code: string) => {
+      const point = Number(code)
+      return point >= 0 && point <= 0x10ffff ? String.fromCodePoint(point) : match
+    })
     .replace(/[ \t]+/g, ' ')
     // Tag removal leaves a space where the tag was, so every line starts with one. Trimming per
     // line rather than only at the ends is worth doing: it is a wasted token on every line of

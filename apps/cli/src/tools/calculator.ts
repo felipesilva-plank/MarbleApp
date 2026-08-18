@@ -198,8 +198,11 @@ export const calculatorTool: Tool = {
   async run(input) {
     const expression = requireString(input, 'expression', { max: 500 })
     const value = evaluate(expression)
-    // Both forms: the model usually wants the exact value, the user usually wants the readable one.
-    const rounded = Math.round(value * 1e10) / 1e10
+    // Trim floating-point noise, but only where multiplying by 1e10 is safe. Doing it
+    // unconditionally overflowed to Infinity for any result above ~1.79e298, so 2^1000 came back
+    // as "Infinity" - a confidently wrong number from the tool whose entire purpose is being right
+    // about arithmetic.
+    const rounded = Math.abs(value) < 1e15 ? Math.round(value * 1e10) / 1e10 : value
     return `${expression} = ${rounded}`
   },
 }

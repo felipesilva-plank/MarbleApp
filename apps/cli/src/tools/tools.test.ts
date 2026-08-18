@@ -422,3 +422,56 @@ describe('registry', () => {
     expect(results.map((r) => r.block.tool_use_id)).toEqual(['a', 'b'])
   })
 })
+
+describe('calculator regressions', () => {
+  /**
+   * The display rounding multiplied by 1e10 before dividing, which overflowed to Infinity for any
+   * result above ~1.79e298 - so the tool whose whole purpose is being right about arithmetic
+   * returned "Infinity" for a perfectly finite answer.
+   */
+  it.each(['2^1000', '1e300', '1e299 * 10'])('does not overflow the display rounding for %s', async (expression) => {
+    const context = await tempContext()
+    const output = await calculatorTool.run({ expression }, context)
+    expect(output).not.toContain('Infinity')
+    expect(Number(output.split(' = ')[1])).toBeGreaterThan(1e200)
+  })
+
+  it('still trims floating-point noise at ordinary magnitudes', async () => {
+    const context = await tempContext()
+    expect(await calculatorTool.run({ expression: '0.1 + 0.2' }, context)).toBe('0.1 + 0.2 = 0.3')
+  })
+
+  it('still refuses a genuinely infinite result', async () => {
+    const context = await tempContext()
+    await expect(calculatorTool.run({ expression: '1e308 * 10' }, context)).rejects.toThrow(
+      /not a finite number/,
+    )
+  })
+})
+
+describe('htmlToText regressions', () => {
+  /**
+   * String.fromCodePoint throws a RangeError above 0x10FFFF. That is not a ToolError, so one
+   * malformed entity killed the entire page read - and research() then recorded the source as
+   * unreachable and dropped it from the report.
+   */
+  it.each(['&#1114112;', '&#99999999;'])('leaves the out-of-range entity %s alone', (entity) => {
+    expect(() => htmlToText(`<p>price ${entity} x</p>`)).not.toThrow()
+    expect(htmlToText(`<p>price ${entity} x</p>`)).toContain(entity)
+  })
+
+  it('still decodes an in-range numeric entity', () => {
+    expect(htmlToText('<p>caf&#233;</p>')).toBe('café')
+  })
+
+  it('survives a whole page read containing one', async () => {
+    const context = await tempContext({
+      fetch: (async () =>
+        new Response('<p>a &#1114112; b</p>', {
+          status: 200,
+          headers: { 'Content-Type': 'text/html' },
+        })) as never,
+    })
+    await expect(readUrlTool.run({ url: 'https://example.com' }, context)).resolves.toContain('a &#1114112; b')
+  })
+})
