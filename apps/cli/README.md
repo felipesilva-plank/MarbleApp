@@ -62,15 +62,16 @@ A four-step chain rather than the agent loop, because the shape of the work is k
 | Step | Model | Does |
 | --- | --- | --- |
 | 1 | Haiku | Turn the topic into 3 distinct search queries |
-| 2 | Haiku | Run them concurrently, dedupe results by URL |
+| 2 | — | Run them concurrently, dedupe results by URL (no model call) |
 | 3 | Sonnet | Read the top N pages, extract only what is relevant |
 | 4 | Sonnet | Synthesise a cited markdown report |
 
 Three things the chain buys that an agent loop cannot:
 
-- **Model routing.** Steps 1–2 are mechanical, so Haiku does them at a fifth of the price. On a
-  typical run that is most of the saving, and `/research` prints the per-step breakdown so the
-  claim is checkable rather than asserted.
+- **Model routing.** Step 1 is decomposition, which Haiku does as well as Sonnet for a fifth of
+  the price; step 2 calls no model at all. Be honest about the size of this: the tokens are in
+  steps 3–4, so routing step 1 saves a few percent of a run, not most of it. `/research` prints
+  the per-step breakdown precisely so the claim stays checkable.
 - **Bounded cost.** Exactly three queries, exactly N reads. An agent can decide to search eleven
   more times.
 - **Failure isolation.** An unreachable page degrades the report and is *named* in the output; in
@@ -93,7 +94,7 @@ nobody notices when it stops working.
 therefore stale-able: `/cost` prints the date the rates were last checked instead of presenting
 them as current, and an unknown model id gets zero pricing with the total labelled a floor.
 
-**Retries are narrated.** The SDK's own retries are configured off (`maxRetries: 0`) because a
+**Retries are narrated** (through `AgentOptions.retry`). The SDK's own retries are configured off (`maxRetries: 0`) because a
 silent 45-second pause reads as a hang. `retry-after` is honoured when the API sends it, full
 jitter otherwise, and a 4xx fails immediately — five backoffs cannot fix a bad request. Retry
 notices go to stderr, so piping stdout to a file keeps only the reply.

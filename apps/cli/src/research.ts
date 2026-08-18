@@ -1,4 +1,5 @@
 import type { MarbleClient } from './client.js'
+import type { RetryOptions } from './retry.js'
 import { addUsage, costUsd, EMPTY_USAGE, resolveModel } from './models.js'
 import type { Usage } from './models.js'
 import { readUrlTool, webSearchTool } from './tools/web.js'
@@ -11,8 +12,11 @@ import type { ToolContext } from './tools/types.js'
  * Written as a chain rather than handed to the agent loop because the shape of the work is known
  * in advance. That buys three things an agent cannot give you:
  *
- *   - Model routing per step. Steps 1 and 2 are mechanical, so Haiku does them at a fifth of the
- *     price; only reading and synthesis need Sonnet. On a typical run that is most of the cost.
+ *   - Model routing per step. Step 1 is decomposition, which Haiku does as well as Sonnet at a
+ *     fifth of the price. Step 2 calls no model at all. The tokens live in steps 3 and 4 - three
+ *     8,000-character extractions and a synthesis - so the routing saves a few percent of a run,
+ *     not most of it. The printed per-step breakdown is there so that claim stays checkable rather
+ *     than becoming folklore.
  *   - Bounded work. The agent loop can decide to search eleven more times. This does exactly
  *     three queries and reads exactly N pages, so the cost is knowable before you start.
  *   - Failure isolation. One unreachable page degrades the report; in an agent loop it becomes a
@@ -30,6 +34,7 @@ export interface ResearchOptions {
   /** Steps 3 and 4. */
   strongModel?: string
   onStep?: (step: number, description: string) => void
+  retry?: RetryOptions
   signal?: AbortSignal
 }
 
@@ -85,6 +90,7 @@ export async function research(
     fastModel = 'haiku',
     strongModel = 'sonnet',
     onStep = () => undefined,
+    retry,
     signal,
   } = options
 
@@ -118,6 +124,7 @@ export async function research(
       temperature: 0,
       maxTokens: 400,
       signal,
+      retry,
     },
   )
   track('plan queries', resolveModel(fastModel).alias, planning)
@@ -189,7 +196,7 @@ export async function research(
               `reply with exactly NOTHING RELEVANT.`,
           },
         ],
-        { model: strongModel, temperature: 0, maxTokens: 1200, signal },
+        { model: strongModel, temperature: 0, maxTokens: 1200, signal, retry },
       )
       track(`read ${new URL(url).hostname}`, resolveModel(strongModel).alias, extraction)
 
@@ -233,7 +240,7 @@ export async function research(
       },
     ],
     // Slight warmth here only: this step is writing, unlike the three before it.
-    { model: strongModel, temperature: 0.3, maxTokens: 2000, signal },
+    { model: strongModel, temperature: 0.3, maxTokens: 2000, signal, retry },
   )
   track('synthesise', resolveModel(strongModel).alias, synthesis)
 

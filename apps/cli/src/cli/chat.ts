@@ -192,6 +192,12 @@ async function runResearch(topic: string): Promise<void> {
   try {
     const result = await research(client, topic, toolContext, {
       onStep: (step, description) => stdout.write(`  [${step}/4] ${description}\n`),
+      retry: {
+        onRetry: ({ attempt, delayMs, reason }) =>
+          stderr.write(
+            `\n[${reason}; retrying in ${Math.round(delayMs / 1000)}s, attempt ${attempt}]\n`,
+          ),
+      },
       signal: inFlight.signal,
     })
 
@@ -216,8 +222,12 @@ async function runResearch(topic: string): Promise<void> {
         .join(' · ')}]\n[research total ${formatUsd(result.costUsd)}]\n`,
     )
 
-    // The chain is not part of the chat history - a 2,000-word report in context would dominate
-    // every following turn. The topic and the conclusion are enough to follow up on.
+    // Same empty-content trap as send(): an assistant message with no text makes every later
+    // request invalid, so nothing goes into history unless there is a report to put there.
+    if (result.report.trim().length === 0) return
+
+    // The chain's transcript is not part of chat history - a 2,000-word report in context would
+    // dominate every following turn. The topic and the conclusion are enough to follow up on.
     addUser(state, `/research ${topic}`)
     addAssistant(state, result.report)
   } catch (error) {
