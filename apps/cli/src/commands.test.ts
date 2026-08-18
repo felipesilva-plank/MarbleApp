@@ -245,3 +245,41 @@ describe('session', () => {
     expect(state.messages).toHaveLength(2)
   })
 })
+
+describe('/limits', () => {
+  it('reports both guards', () => {
+    expect(run('/limits', context())).toBe('Max 15 tool-use turns per question, $1.00 cost limit.')
+  })
+
+  it('sets turns alone', () => {
+    const ctx = context()
+    run('/limits 5', ctx)
+    expect(ctx.state.maxTurns).toBe(5)
+    expect(ctx.state.maxCostUsd).toBe(1)
+  })
+
+  it('sets turns and cost together', () => {
+    const ctx = context()
+    run('/limits 30 0.25', ctx)
+    expect(ctx.state.maxTurns).toBe(30)
+    expect(ctx.state.maxCostUsd).toBe(0.25)
+  })
+
+  it('removes the cost limit with "none"', () => {
+    const ctx = context()
+    run('/limits 10 none', ctx)
+    expect(ctx.state.maxCostUsd).toBeNull()
+  })
+
+  it.each(['0', '99', 'lots'])('rejects %s turns without changing anything', (input) => {
+    const ctx = context()
+    run(`/limits ${input}`, ctx)
+    expect(ctx.state.maxTurns).toBe(15)
+  })
+
+  it('rejects a negative cost limit', () => {
+    const ctx = context()
+    run('/limits 5 -1', ctx)
+    expect(ctx.state.maxCostUsd).toBe(1)
+  })
+})

@@ -41,6 +41,7 @@ function helpText(): string {
     '  /temp [0-1]                      show or set temperature',
     '  /max-tokens [n]                  show or set the response cap',
     '  /system [text]                   show, set, or (with "reset") restore the system prompt',
+    '  /limits [turns] [cost]           agent-loop guards: max turns, max USD per question',
     '  /cost                            tokens and estimated spend this session',
     '  /clear                           forget the conversation, keep the settings',
     '  /help                            this list',
@@ -158,6 +159,39 @@ export function runCommand(line: string, context: CommandContext): CommandResult
       }
       state.maxTokens = value
       return { output: `Max tokens is now ${value}.` }
+    }
+
+    case 'limits': {
+      if (!argument) {
+        return {
+          output:
+            `Max ${state.maxTurns} tool-use turns per question, ` +
+            `${state.maxCostUsd === null ? 'no cost limit' : `${formatUsd(state.maxCostUsd)} cost limit`}.`,
+        }
+      }
+      const [turnsRaw, costRaw] = argument.split(/\s+/)
+      const turns = Number(turnsRaw)
+      if (!Number.isInteger(turns) || turns < 1 || turns > 50) {
+        return { output: `Turns must be a whole number between 1 and 50. Got "${turnsRaw}".` }
+      }
+      state.maxTurns = turns
+
+      if (costRaw !== undefined) {
+        if (costRaw === 'none') state.maxCostUsd = null
+        else {
+          const cost = Number(costRaw)
+          if (!Number.isFinite(cost) || cost <= 0) {
+            return { output: `Cost limit must be a positive number, or "none". Got "${costRaw}".` }
+          }
+          state.maxCostUsd = cost
+        }
+      }
+
+      return {
+        output:
+          `Max ${state.maxTurns} turns, ` +
+          `${state.maxCostUsd === null ? 'no cost limit' : `${formatUsd(state.maxCostUsd)} per question`}.`,
+      }
     }
 
     case 'system': {

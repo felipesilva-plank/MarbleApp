@@ -14,11 +14,18 @@ export interface SessionState {
   temperature: number
   maxTokens: number
   system: string | undefined
+  /** Agent-loop guards. Exposed on the session so /limits can change them mid-conversation. */
+  maxTurns: number
+  maxCostUsd: number | null
 }
 
 export const DEFAULT_SYSTEM =
   'You are a concise assistant for the MarbleApp team. Prefer short, direct answers. ' +
-  'When you are not sure, say so rather than guessing.'
+  'When you are not sure, say so rather than guessing.\n\n' +
+  'You have tools. Use calculator for ANY arithmetic rather than computing it yourself. ' +
+  'Search and read before answering a question about the current state of the world, and cite ' +
+  'the URL you took each claim from. Check list_notes before searching - the answer may already ' +
+  'have been found and saved.'
 
 export function createSession(overrides: Partial<SessionState> = {}): SessionState {
   return {
@@ -27,6 +34,8 @@ export function createSession(overrides: Partial<SessionState> = {}): SessionSta
     temperature: 1,
     maxTokens: 4096,
     system: DEFAULT_SYSTEM,
+    maxTurns: 15,
+    maxCostUsd: 1,
     ...overrides,
   }
 }
