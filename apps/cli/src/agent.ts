@@ -6,6 +6,7 @@ import type {
 import type { MarbleClient } from './client.js'
 import { addUsage, costUsd, EMPTY_USAGE, formatUsd, resolveModel } from './models.js'
 import type { Usage } from './models.js'
+import type { RetryOptions } from './retry.js'
 import { executeTools, toAnthropicTools, toolRegistry } from './tools/registry.js'
 import type { Tool, ToolContext } from './tools/types.js'
 
@@ -35,6 +36,8 @@ export interface AgentOptions {
   maxTurns?: number
   /** Stop before a turn that would take the run past this. Null disables the check. */
   maxCostUsd?: number | null
+  /** Passed through per turn, so a caller can narrate retries instead of sitting in silence. */
+  retry?: RetryOptions
   events?: AgentEvents
 }
 
@@ -59,6 +62,7 @@ export async function runAgent(
     maxCostUsd = 1,
     tools,
     events = {},
+    retry,
     model,
     system,
     temperature,
@@ -96,6 +100,7 @@ export async function runAgent(
       maxTokens,
       signal: toolContext.signal,
       onText: events.onText,
+      retry,
     })
 
     usage = addUsage(usage, result.usage)
