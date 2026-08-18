@@ -1,6 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { loadLocalEnv } from './env.js'
-import type { MessageParam } from '@anthropic-ai/sdk/resources/messages'
+import type {
+  ContentBlock,
+  MessageParam,
+  Tool as AnthropicTool,
+} from '@anthropic-ai/sdk/resources/messages'
 import { addUsage, costUsd, EMPTY_USAGE, resolveModel } from './models.js'
 import type { ModelSpec, Usage } from './models.js'
 import { withRetry } from './retry.js'
@@ -118,6 +122,60 @@ export class MarbleClient {
       .join('')
 
     return { text, usage, costUsd: costUsd(spec, usage), model: spec, stopReason: message.stop_reason }
+  }
+
+  /**
+   * Like `ask`, but the model may answer with tool_use blocks instead of text - so this returns the
+   * raw content array rather than only the text. The agent loop needs the blocks verbatim: they go
+   * back into the history unchanged, and a tool_use id that does not round-trip exactly makes the
+   * next request invalid.
+   */
+  async askWithTools(
+    messages: MessageParam[],
+    tools: AnthropicTool[],
+    options: AskOptions = {},
+  ): Promise<AskResult & { content: ContentBlock[] }> {
+    const spec = resolveModel(options.model ?? this.defaultModel)
+
+    const request = {
+      model: spec.id,
+      max_tokens: options.maxTokens ?? 4096,
+      messages,
+      tools,
+      ...(options.system ? { system: options.system } : {}),
+      ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+    }
+
+    const message = await withRetry(async () => {
+      if (!options.onText) {
+        return this.anthropic.messages.create(request, { signal: options.signal })
+      }
+      const stream = this.anthropic.messages.stream(request, { signal: options.signal })
+      stream.on('text', options.onText)
+      return stream.finalMessage()
+    }, options.retry)
+
+    const usage: Usage = {
+      inputTokens: message.usage.input_tokens ?? 0,
+      outputTokens: message.usage.output_tokens ?? 0,
+      cacheCreationTokens: message.usage.cache_creation_input_tokens ?? 0,
+      cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
+    }
+
+    this.totals.set(spec.id, addUsage(this.totals.get(spec.id) ?? EMPTY_USAGE, usage))
+
+    const text = message.content
+      .flatMap((block) => (block.type === 'text' ? [block.text] : []))
+      .join('')
+
+    return {
+      text,
+      content: message.content,
+      usage,
+      costUsd: costUsd(spec, usage),
+      model: spec,
+      stopReason: message.stop_reason,
+    }
   }
 
   /** Per-model totals so far, newest model last. */
