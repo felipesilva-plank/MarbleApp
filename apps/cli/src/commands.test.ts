@@ -205,7 +205,17 @@ describe('/cost', () => {
 describe('/help and /exit', () => {
   it('lists every command', () => {
     const output = run('/help', context())
-    for (const command of ['/model', '/temp', '/max-tokens', '/system', '/cost', '/clear', '/exit']) {
+    for (const command of [
+      '/model',
+      '/temp',
+      '/max-tokens',
+      '/system',
+      '/cost',
+      '/clear',
+      '/research',
+      '/limits',
+      '/exit',
+    ]) {
       expect(output).toContain(command)
     }
   })

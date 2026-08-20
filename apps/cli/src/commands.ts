@@ -41,6 +41,7 @@ function helpText(): string {
     '  /temp [0-1]                      show or set temperature',
     '  /max-tokens [n]                  show or set the response cap',
     '  /system [text]                   show, set, or (with "reset") restore the system prompt',
+    '  /research <topic>                four-step chain: plan, search, read, synthesise',
     '  /limits [turns] [cost]           agent-loop guards: max turns, max USD per question',
     '  /cost                            tokens and estimated spend this session',
     '  /clear                           forget the conversation, keep the settings',

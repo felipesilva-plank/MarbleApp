@@ -13,6 +13,7 @@ import { MarbleClient, MissingApiKeyError } from '../client.js'
 import { isCommand, runCommand } from '../commands.js'
 import { formatUsd, resolveModel } from '../models.js'
 import { parseArgs, USAGE } from '../args.js'
+import { research } from '../research.js'
 import { addAssistant, addUser, createSession, rollbackLastUser } from '../session.js'
 import { ALL_TOOLS } from '../tools/registry.js'
 import type { ToolContext } from '../tools/types.js'
@@ -179,6 +180,65 @@ async function send(text: string): Promise<void> {
   }
 }
 
+async function runResearch(topic: string): Promise<void> {
+  inFlight = new AbortController()
+
+  const toolContext: ToolContext = {
+    fetch: globalThis.fetch,
+    notesPath: NOTES_PATH,
+    signal: inFlight.signal,
+  }
+
+  try {
+    const result = await research(client, topic, toolContext, {
+      onStep: (step, description) => stdout.write(`  [${step}/4] ${description}\n`),
+      retry: {
+        onRetry: ({ attempt, delayMs, reason }) =>
+          stderr.write(
+            `\n[${reason}; retrying in ${Math.round(delayMs / 1000)}s, attempt ${attempt}]\n`,
+          ),
+      },
+      signal: inFlight.signal,
+    })
+
+    stdout.write(`\n${result.report}\n`)
+
+    const unreachable = result.sources.filter((s) => s.extract === null)
+    if (unreachable.length > 0) {
+      // Said out loud: a report resting on two sources while three were attempted should not look
+      // the same as one that read all three.
+      stdout.write(
+        `\n  Could not read ${unreachable.length} source${unreachable.length === 1 ? '' : 's'}:\n` +
+          unreachable.map((s) => `    ${s.url} - ${s.error ?? 'no relevant content'}`).join('\n') +
+          '\n',
+      )
+    }
+
+    // The per-step breakdown is the argument for routing models, so it is printed rather than
+    // buried in the return value.
+    stderr.write(
+      `\n[${result.breakdown
+        .map((b) => `${b.step}: ${b.model} ${formatUsd(b.costUsd)}`)
+        .join(' · ')}]\n[research total ${formatUsd(result.costUsd)}]\n`,
+    )
+
+    // Same empty-content trap as send(): an assistant message with no text makes every later
+    // request invalid, so nothing goes into history unless there is a report to put there.
+    if (result.report.trim().length === 0) return
+
+    // The chain's transcript is not part of chat history - a 2,000-word report in context would
+    // dominate every following turn. The topic and the conclusion are enough to follow up on.
+    addUser(state, `/research ${topic}`)
+    addAssistant(state, result.report)
+  } catch (error) {
+    rollbackLastUser(state)
+    const aborted = error instanceof Error && error.name === 'AbortError'
+    if (!aborted) stderr.write(`\n${error instanceof Error ? error.message : String(error)}\n`)
+  } finally {
+    inFlight = null
+  }
+}
+
 stdout.write(
   `marble chat · ${resolveModel(state.model).id} · temp ${state.temperature}\n` +
     `/help for commands, /exit to quit.\n\n`,
@@ -200,7 +260,11 @@ for await (const raw of rl) {
   const line = raw.trim()
 
   if (line !== '') {
-    if (isCommand(line)) {
+    if (line.startsWith('/research')) {
+      const topic = line.slice('/research'.length).trim()
+      if (!topic) stdout.write('Usage: /research <topic>\n')
+      else await runResearch(topic)
+    } else if (isCommand(line)) {
       const result = runCommand(line, commandContext())
       stdout.write(`${result.output}\n`)
       if (result.exit) break
