@@ -7,11 +7,15 @@
  */
 import { createInterface } from 'node:readline/promises'
 import { stdin, stdout, stderr } from 'node:process'
+import { join } from 'node:path'
+import { runAgent } from '../agent.js'
 import { MarbleClient, MissingApiKeyError } from '../client.js'
 import { isCommand, runCommand } from '../commands.js'
 import { formatUsd, resolveModel } from '../models.js'
 import { parseArgs, USAGE } from '../args.js'
 import { addAssistant, addUser, createSession, rollbackLastUser } from '../session.js'
+import { ALL_TOOLS } from '../tools/registry.js'
+import type { ToolContext } from '../tools/types.js'
 
 const args = parseArgs(process.argv.slice(2))
 
@@ -42,6 +46,34 @@ const state = createSession({
 
 const rl = createInterface({ input: stdin, output: stdout })
 
+const NOTES_PATH = process.env.MARBLE_NOTES_PATH ?? join(process.cwd(), '.marble-notes.json')
+
+/**
+ * Confirmation for tools that write. Reads from the same readline instance, which is why it is
+ * here and not inside the tool: the tool should not know what a terminal is.
+ *
+ * Serialised through a single-flight chain. Tool calls within one turn run concurrently, and
+ * save_note's own description encourages one note per fact - so two of them in one turn is normal.
+ * Two concurrent rl.question() calls on one interface WEDGE THE PROCESS: readline registers a
+ * callback for the first only, the second never settles, Promise.all never resolves, and Ctrl-C
+ * cannot help because the SIGINT handler suppresses process death. Chaining makes them queue.
+ */
+let confirmQueue: Promise<unknown> = Promise.resolve()
+
+function confirmToolCall(tool: string, input: unknown): Promise<boolean> {
+  const next = confirmQueue.then(async () => {
+    const summary = JSON.stringify(input, null, 2)
+    stdout.write(
+      `\n  ${tool} wants to write:\n${summary.split('\n').map((l) => `    ${l}`).join('\n')}\n`,
+    )
+    const answer = (await rl.question('  allow? [y/N] ')).trim().toLowerCase()
+    return answer === 'y' || answer === 'yes'
+  })
+  // Keep the chain alive even if one prompt rejects, or every later confirmation inherits it.
+  confirmQueue = next.catch(() => undefined)
+  return next
+}
+
 /** Set while a reply is streaming, so Ctrl-C cancels the request instead of killing the process. */
 let inFlight: AbortController | null = null
 
@@ -63,36 +95,74 @@ async function send(text: string): Promise<void> {
   addUser(state, text)
 
   inFlight = new AbortController()
-  let printedAnything = false
+
+  const toolContext: ToolContext = {
+    fetch: globalThis.fetch,
+    notesPath: NOTES_PATH,
+    confirm: confirmToolCall,
+    signal: inFlight.signal,
+  }
+
+  let streamedAnything = false
 
   try {
-    const result = await client.ask(state.messages, {
+    const result = await runAgent(client, state.messages, toolContext, {
       model: state.model,
       temperature: state.temperature,
       maxTokens: state.maxTokens,
       system: state.system,
-      signal: inFlight.signal,
-      onText: (delta) => {
-        printedAnything = true
-        stdout.write(delta)
-      },
+      tools: ALL_TOOLS,
+      maxTurns: state.maxTurns,
+      maxCostUsd: state.maxCostUsd,
       retry: {
-        onRetry: ({ attempt, delayMs, reason }) => {
-          // Narrated on stderr so piping stdout to a file keeps only the reply.
-          stderr.write(`\n[${reason}; retrying in ${Math.round(delayMs / 1000)}s, attempt ${attempt}]\n`)
+        // Narrated, or four backoffs pass in ~15 seconds of complete silence - the exact failure
+        // retry.ts says it exists to prevent, and it was wired to nothing.
+        onRetry: ({ attempt, delayMs, reason }) =>
+          stderr.write(
+            `\n[${reason}; retrying in ${Math.round(delayMs / 1000)}s, attempt ${attempt}]\n`,
+          ),
+      },
+      events: {
+        // Streaming: without this, askWithTools silently takes the non-streaming path and the
+        // whole reply lands at once after the full latency.
+        onText: (delta) => {
+          streamedAnything = true
+          stdout.write(delta)
         },
+        onToolStart: (calls) => {
+          for (const call of calls) {
+            const preview = JSON.stringify(call.input)
+            stdout.write(
+              `\n  → ${call.name}(${preview.length > 90 ? `${preview.slice(0, 87)}…` : preview})\n`,
+            )
+          }
+        },
+        onToolEnd: (results) => {
+          for (const r of results) {
+            stdout.write(`  ${r.ok ? '✓' : '✗'} ${r.name} (${r.ms}ms)\n`)
+          }
+        },
+        onLimit: (reason) => stderr.write(`\n[${reason}]\n`),
       },
     })
 
-    addAssistant(state, result.text)
-    stdout.write(printedAnything ? '\n' : `${result.text}\n`)
-
-    if (result.stopReason === 'max_tokens') {
-      stderr.write(`[cut off at max_tokens=${state.maxTokens}; raise it with /max-tokens]\n`)
+    // An empty assistant turn is not a harmless no-op: the API rejects a non-final assistant
+    // message with empty content, so writing one here poisons EVERY later request until /clear.
+    // runAgent returns (rather than throwing) on abort and on max_turns, so the catch block below
+    // never ran for those - which is exactly when text is empty.
+    if (result.text.trim().length === 0) {
+      rollbackLastUser(state)
+      stdout.write(`\n(no answer - ${result.stoppedBecause.replace('_', ' ')})\n`)
+      return
     }
 
+    addAssistant(state, result.text)
+    stdout.write(streamedAnything ? '\n' : `${result.text}\n`)
+
     stderr.write(
-      `[${result.model.alias} · ${result.usage.inputTokens} in / ${result.usage.outputTokens} out` +
+      `[${resolveModel(state.model).alias} · ${result.turns} turn${result.turns === 1 ? '' : 's'}` +
+        `${result.toolCalls > 0 ? ` · ${result.toolCalls} tool calls` : ''}` +
+        ` · ${result.usage.inputTokens} in / ${result.usage.outputTokens} out` +
         ` · ${formatUsd(result.costUsd)} · ${formatUsd(client.sessionCostUsd())} session]\n`,
     )
   } catch (error) {

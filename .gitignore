@@ -152,3 +152,6 @@ vite.config.ts.timestamp-*
 
 # MCP inventory snapshot - a disposable read model, rebuilt from a backup export
 packages/mcp-inventory/*.db
+
+# Notes written by the CLI's save_note tool
+.marble-notes.json
