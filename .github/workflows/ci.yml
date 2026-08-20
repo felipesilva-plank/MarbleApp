@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to a PR makes the in-flight run pointless. Cancel it rather than
+# queueing behind it - preview deploys are what gate a merge, not a stale run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck / test / build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # `ci` not `install`: fails loudly if package-lock.json drifted from
+      # package.json instead of silently resolving new versions.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # The smoke suite catches render crashes, but only a real build catches
+      # a bad import path or a Tailwind class that does not survive purging.
+      - name: Build
+        run: npm run build

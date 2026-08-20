@@ -1,8 +1,13 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { backup, errorMessage } from '../data'
 import { usePieces } from '../hooks/usePieces'
 import { useMaterials } from '../hooks/useMaterials'
+import { StorageMeter } from '../components/StorageMeter'
+import { buildInfo } from '../lib/buildInfo'
+import { formatDate } from '../lib/format'
+import { storageUsage } from '../lib/storage'
+import type { StorageUsage } from '../lib/storage'
 import { Alert, Button, Card, Modal, PageHeader, SectionTitle, Spinner } from '../components/ui'
 
 function downloadJson(filename: string, contents: string) {
@@ -25,8 +30,22 @@ export function Settings() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [pendingImport, setPendingImport] = useState<string | null>(null)
+  const [usage, setUsage] = useState<StorageUsage | null>(null)
 
   const photoCount = (pieces ?? []).filter((p) => p.hasPhoto).length
+  const build = buildInfo()
+
+  // Re-measure whenever the inventory changes: an import is exactly when someone wants to know
+  // whether they just filled the browser up.
+  useEffect(() => {
+    let cancelled = false
+    void storageUsage().then((next) => {
+      if (!cancelled) setUsage(next)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [pieces, materials])
 
   async function handleExport() {
     setBusy(true)
@@ -110,6 +129,11 @@ export function Settings() {
             <dd className="text-xl font-semibold text-stone-900">{photoCount}</dd>
           </div>
         </dl>
+        {usage ? (
+          <div className="mt-5 border-t border-stone-200 pt-4">
+            <StorageMeter usage={usage} />
+          </div>
+        ) : null}
       </Card>
 
       <Card className="mb-6 p-5">
@@ -143,6 +167,22 @@ export function Settings() {
         <Button onClick={() => fileRef.current?.click()} disabled={busy}>
           Choose a backup file…
         </Button>
+      </Card>
+
+      <Card className="mt-6 p-5">
+        <SectionTitle>Build</SectionTitle>
+        <p className="mb-4 text-sm text-stone-600">
+          Which build this tab is running. Worth checking before reporting something odd — this app
+          keeps its data locally, so tabs stay open across deploys.
+        </p>
+        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+          <dt className="text-stone-500">Version</dt>
+          <dd className="font-medium text-stone-900">{build.version}</dd>
+          <dt className="text-stone-500">Commit</dt>
+          <dd className="font-mono text-stone-900">{build.commit}</dd>
+          <dt className="text-stone-500">Built</dt>
+          <dd className="text-stone-900">{build.builtAt ? formatDate(build.builtAt) : '—'}</dd>
+        </dl>
       </Card>
 
       <Modal
