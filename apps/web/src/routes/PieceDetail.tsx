@@ -155,6 +155,9 @@ export function PieceDetail() {
             <Link to={`/pieces/${piece.id}/edit`}>
               <Button>Edit</Button>
             </Link>
+            <Link to={`/pieces/new?duplicateOf=${piece.id}`}>
+              <Button>Duplicate</Button>
+            </Link>
             <Button variant="ghost" onClick={() => setDeleteModalOpen(true)}>
               Delete
             </Button>
