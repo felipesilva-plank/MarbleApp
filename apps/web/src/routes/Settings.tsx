@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { backup, errorMessage } from '../data'
 import { usePieces } from '../hooks/usePieces'
 import { useMaterials } from '../hooks/useMaterials'
+import { capture } from '../lib/analytics'
 import { StorageMeter } from '../components/StorageMeter'
 import { buildInfo } from '../lib/buildInfo'
 import { formatDate } from '../lib/format'
@@ -55,6 +56,10 @@ export function Settings() {
       const json = await backup.exportAll()
       const stamp = new Date().toISOString().slice(0, 10)
       downloadJson(`marbleapp-backup-${stamp}.json`, json)
+      capture('backup_exported', {
+        piece_count: pieces?.length ?? 0,
+        photo_count: photoCount,
+      })
       setNotice('Backup downloaded.')
     } catch (caught) {
       setError(errorMessage(caught))
@@ -81,8 +86,12 @@ export function Settings() {
     setBusy(true)
     setError(null)
     try {
-      await backup.importAll(pendingImport)
+      // The count comes from importAll, not from `pieces`: that is captured from the render
+      // closure and still holds the PRE-import inventory, so a fresh browser restoring 500 pieces
+      // reported 0 - which is exactly the number this event exists to answer.
+      const restored = await backup.importAll(pendingImport)
       await queryClient.invalidateQueries()
+      capture('backup_imported', { piece_count: restored.pieces })
       setNotice('Backup restored.')
       setPendingImport(null)
     } catch (caught) {

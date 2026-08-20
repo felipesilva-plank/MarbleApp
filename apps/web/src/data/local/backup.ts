@@ -27,7 +27,7 @@ export const localBackupPort: BackupPort = {
     return JSON.stringify(payload, null, 2)
   },
 
-  async importAll(json: string): Promise<void> {
+  async importAll(json: string): Promise<{ pieces: number; materials: number }> {
     let parsed: unknown
     try {
       parsed = JSON.parse(json)
@@ -57,5 +57,7 @@ export const localBackupPort: BackupPort = {
     // presets rather than leave the previous inventory's filters pointing at gone materials.
     writePresets((backup.presets ?? []) as FilterPreset[])
     await photos.replaceAllPhotos(backup.photos ?? {})
+
+    return { pieces: pieces.length, materials: backup.materials.length }
   },
 }

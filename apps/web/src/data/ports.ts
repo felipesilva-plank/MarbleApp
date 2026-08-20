@@ -83,5 +83,6 @@ export interface AuthPort {
 
 export interface BackupPort {
   exportAll(): Promise<string>
-  importAll(json: string): Promise<void>
+  /** Returns what was restored - the caller has no other way to know, its cached data is stale. */
+  importAll(json: string): Promise<{ pieces: number; materials: number }>
 }

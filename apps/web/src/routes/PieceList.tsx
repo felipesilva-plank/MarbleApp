@@ -18,6 +18,7 @@ import { usePieces } from '../hooks/usePieces'
 import { useMaterialMap, useMaterials } from '../hooks/useMaterials'
 import { useCreatePreset, useDeletePreset, usePresets } from '../hooks/usePresets'
 import { formatRelative } from '../lib/format'
+import { capture } from '../lib/analytics'
 import { downloadText } from '../lib/download'
 import { pieceCsvColumns, pieceCsvLookups } from '../lib/pieceCsv'
 import { PresetBar } from '../components/PresetBar'
@@ -81,6 +82,7 @@ export function PieceList() {
     const currentView = params.get('view')
     if (currentView) next.set('view', currentView)
     setPresetError(null)
+    capture('preset_applied', { filter_count: new URLSearchParams(preset.query).size })
     setParams(next, { replace: true })
   }
 
@@ -88,6 +90,7 @@ export function PieceList() {
     setPresetError(null)
     try {
       await createPreset.mutateAsync({ name, query: params.toString() })
+      capture('preset_saved', { filter_count: activeFilterCount })
     } catch (caught) {
       setPresetError(errorMessage(caught))
     }
@@ -98,6 +101,7 @@ export function PieceList() {
     const csv = toCsvFile(results, pieceCsvColumns(lookups.materialName, lookups.codeOf))
     const stamp = new Date().toISOString().slice(0, 10)
     downloadText(`marbleapp-pieces-${stamp}.csv`, csv, 'text/csv;charset=utf-8')
+    capture('pieces_exported_csv', { row_count: results.length })
   }
 
   async function removePreset(preset: FilterPreset) {
