@@ -2,8 +2,15 @@ import { localAuthPort } from './local/authRepo'
 import { localBackupPort } from './local/backup'
 import { localMaterialRepository } from './local/materialRepo'
 import { localPieceRepository } from './local/pieceRepo'
+import { localPresetRepository } from './local/presetRepo'
 import { seedIfEmpty } from './local/seed'
-import type { AuthPort, BackupPort, MaterialRepository, PieceRepository } from './ports'
+import type {
+  AuthPort,
+  BackupPort,
+  MaterialRepository,
+  PieceRepository,
+  PresetRepository,
+} from './ports'
 
 /**
  * The adapter selection point. Migrating to the Fastify API is this file and nothing else:
@@ -16,6 +23,7 @@ import type { AuthPort, BackupPort, MaterialRepository, PieceRepository } from '
 
 export const pieces: PieceRepository = localPieceRepository
 export const materials: MaterialRepository = localMaterialRepository
+export const presets: PresetRepository = localPresetRepository
 export const auth: AuthPort = localAuthPort
 export const backup: BackupPort = localBackupPort
 

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import {
   PIECE_KINDS,
@@ -11,9 +11,13 @@ import {
   isUnlinked,
 } from '@marble/core'
 import type { PieceFilter, PieceKind, PieceStatus } from '@marble/core'
+import type { FilterPreset } from '@marble/core'
+import { errorMessage } from '../data'
 import { usePieces } from '../hooks/usePieces'
 import { useMaterialMap, useMaterials } from '../hooks/useMaterials'
+import { useCreatePreset, useDeletePreset, usePresets } from '../hooks/usePresets'
 import { formatRelative } from '../lib/format'
+import { PresetBar } from '../components/PresetBar'
 import { KindBadge, OrphanBadge, StatusBadge } from '../components/badges'
 import { PieceThumb } from '../components/PieceThumb'
 import {
@@ -57,6 +61,39 @@ export function PieceList() {
 
   const { data: pieces, isLoading } = usePieces(filter)
   const results = pieces ?? []
+
+  const { data: presets } = usePresets()
+  const createPreset = useCreatePreset()
+  const deletePreset = useDeletePreset()
+  const [presetError, setPresetError] = useState<string | null>(null)
+
+  // Applying a preset replaces the filter params outright but leaves `view` alone: which columns
+  // you like looking at is a separate preference from what you are filtering for.
+  function applyPreset(preset: FilterPreset) {
+    const next = new URLSearchParams(preset.query)
+    const currentView = params.get('view')
+    if (currentView) next.set('view', currentView)
+    setPresetError(null)
+    setParams(next, { replace: true })
+  }
+
+  async function savePreset(name: string) {
+    setPresetError(null)
+    try {
+      await createPreset.mutateAsync({ name, query: params.toString() })
+    } catch (caught) {
+      setPresetError(errorMessage(caught))
+    }
+  }
+
+  async function removePreset(preset: FilterPreset) {
+    setPresetError(null)
+    try {
+      await deletePreset.mutateAsync(preset.id)
+    } catch (caught) {
+      setPresetError(errorMessage(caught))
+    }
+  }
 
   function setParam(key: string, value: string) {
     const next = new URLSearchParams(params)
@@ -102,6 +139,17 @@ export function PieceList() {
             </Link>
           </>
         }
+      />
+
+      <PresetBar
+        presets={presets ?? []}
+        currentQuery={params.toString()}
+        materialName={(id) => materialMap.get(id)?.name}
+        onApply={applyPreset}
+        onSave={(name) => void savePreset(name)}
+        onDelete={(preset) => void removePreset(preset)}
+        saving={createPreset.isPending}
+        error={presetError}
       />
 
       <Card className="mb-6 p-4">

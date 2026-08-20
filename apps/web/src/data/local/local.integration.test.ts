@@ -6,6 +6,7 @@ import { localAuthPort } from './authRepo'
 import { localBackupPort } from './backup'
 import { localMaterialRepository } from './materialRepo'
 import { localPieceRepository } from './pieceRepo'
+import { localPresetRepository } from './presetRepo'
 import { clearPhotos } from './photos'
 
 /**
@@ -15,6 +16,7 @@ import { clearPhotos } from './photos'
 
 const piecesRepo = localPieceRepository
 const materialsRepo = localMaterialRepository
+const presetsRepo = localPresetRepository
 
 function pieceInput(overrides: Partial<CreatePieceInput> = {}): CreatePieceInput {
   return {
@@ -293,5 +295,59 @@ describe('the block → slab → remnant walk', () => {
   it('clears the material reference when a material is deleted', async () => {
     await materialsRepo.remove(block.materialId as string)
     expect((await piecesRepo.get(block.id))?.materialId).toBeNull()
+  })
+
+  // --- saved filter presets (MAR-11) ---
+
+  it('normalises a saved query so click order does not create two presets', async () => {
+    const saved = await presetsRepo.create({ name: 'Thick offcuts', query: 't=30&kind=remnant' })
+    expect(saved.query).toBe('kind=remnant&t=30')
+    expect(saved.slug).toBe('thick-offcuts')
+  })
+
+  it('strips params that are not filters, so a view switch is not a preset', async () => {
+    // VALIDATION rather than DUPLICATE: asserting only `instanceof DomainError` let the wrong
+    // code through, and the code is what becomes an HTTP status.
+    await expect(
+      presetsRepo.create({ name: 'Grid only', query: 'view=grid' }),
+    ).rejects.toMatchObject({ code: 'VALIDATION' })
+    expect(await presetsRepo.list()).toHaveLength(0)
+  })
+
+  it('rejects a duplicate name regardless of case, and writes nothing', async () => {
+    await presetsRepo.create({ name: 'Thick offcuts', query: 'kind=remnant' })
+    await expect(
+      presetsRepo.create({ name: 'THICK OFFCUTS', query: 'kind=slab' }),
+    ).rejects.toMatchObject({ code: 'DUPLICATE' })
+    expect(await presetsRepo.list()).toHaveLength(1)
+  })
+
+  it('round-trips presets through a backup', async () => {
+    await presetsRepo.create({ name: 'Thick offcuts', query: 'kind=remnant&t=30' })
+    const dump = await localBackupPort.exportAll()
+
+    await presetsRepo.remove((await presetsRepo.list())[0].id)
+    expect(await presetsRepo.list()).toHaveLength(0)
+
+    await localBackupPort.importAll(dump)
+    expect(await presetsRepo.list()).toMatchObject([
+      { name: 'Thick offcuts', query: 'kind=remnant&t=30' },
+    ])
+  })
+
+  it('imports a backup written before presets existed', async () => {
+    await presetsRepo.create({ name: 'Leftover', query: 'kind=remnant' })
+
+    const older = JSON.parse(await localBackupPort.exportAll())
+    delete older.presets
+
+    await localBackupPort.importAll(JSON.stringify(older))
+    // Absent means none - restoring an old backup should not leave the previous inventory's
+    // filters pointing at materials that no longer exist.
+    expect(await presetsRepo.list()).toHaveLength(0)
+  })
+
+  it('refuses to delete a preset that is already gone', async () => {
+    await expect(presetsRepo.remove('nope')).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 })

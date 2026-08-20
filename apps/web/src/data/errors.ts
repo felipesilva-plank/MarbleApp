@@ -1,5 +1,6 @@
 export type DomainErrorCode =
   | 'CYCLE'
+  | 'VALIDATION'
   | 'HAS_CHILDREN'
   | 'NOT_FOUND'
   | 'EMAIL_TAKEN'
@@ -11,7 +12,10 @@ export type DomainErrorCode =
 
 /**
  * A failure the user can understand and act on, as opposed to a bug.
- * The future Fastify API maps these one-to-one onto HTTP status codes.
+ * The future Fastify API maps these one-to-one onto HTTP status codes, which is why the choice of
+ * code matters as much as the message: VALIDATION is a 400, DUPLICATE is a 409, and labelling a
+ * bad input as a conflict would have the API telling clients to retry something that can never
+ * succeed.
  */
 export class DomainError extends Error {
   readonly code: DomainErrorCode

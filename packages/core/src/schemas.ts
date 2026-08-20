@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { filterPresetRecordSchema } from './presets'
 import type { PieceKind, PieceStatus } from './types'
 
 /**
@@ -120,6 +121,8 @@ export const backupSchema = z.object({
   counters: countersSchema,
   /** pieceId -> data URL. Absent when the export had no photos. */
   photos: z.record(z.string(), z.string()).optional(),
+  /** Optional so backups written before saved presets existed still import. */
+  presets: z.array(filterPresetRecordSchema).optional(),
 })
 
 export type Backup = z.infer<typeof backupSchema>
