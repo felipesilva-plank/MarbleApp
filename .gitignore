@@ -143,3 +143,7 @@ vite.config.ts.timestamp-*
 .vite/
 .vercel
 .env*
+
+# Claude Code — personal overrides stay local, team settings are committed
+.claude/settings.local.json
+.claude/worktrees/
