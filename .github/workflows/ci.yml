@@ -22,7 +22,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22.5+ for node:sqlite, which @marble/mcp-inventory uses.
+          node-version: 22
           cache: npm
 
       # `ci` not `install`: fails loudly if package-lock.json drifted from
