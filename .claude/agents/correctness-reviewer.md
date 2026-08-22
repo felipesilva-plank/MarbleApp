@@ -23,7 +23,7 @@ real defect gets through.
 
 1. **The architecture rules from CLAUDE.md.** These are invisible to `tsc` and are the highest-value
    findings in this codebase:
-   - Anything above `data/` importing from `data/local/` — grep the diff for `data/local` outside
+   - Anything above `data/` importing from `data/http/` — grep the diff for `data/http` outside
      `apps/web/src/data/`.
    - `packages/core` gaining a React, DOM or `node:` import. Check with
      `grep -rE "from '(react|node:)" packages/core/src`.
@@ -38,7 +38,9 @@ real defect gets through.
      `rootId`/`depth` changed.
    - Code that mutates a parent when a child is created. Cutting a child never mutates the parent —
      kerf loss makes consumption advisory.
-   - `isUnlinked` semantics: a block or slab with no parent is **not** unlinked. Flag anything that
+   - `isUnlinked` semantics: a slab with no parent is **not** unlinked — it was bought. Only a
+     remnant can have lost an origin. Also flag a remnant written without a `remnantOrigin`, or a
+     slab left carrying one. Flag anything that
      treats "no parent" as "orphan" for all kinds.
 
 3. **Edge cases the tests do not cover.** Empty arrays, a single-element tree, a piece whose parent

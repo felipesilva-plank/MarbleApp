@@ -22,7 +22,7 @@ function daysAgo(n: number): Date {
 async function main(): Promise<void> {
   const existing = await db().user.findUnique({ where: { email: DEMO_EMAIL } })
   if (existing) {
-    console.log(`[seed] ${DEMO_EMAIL} already exists — nothing to do.`)
+    console.log(`[seed] ${DEMO_EMAIL} already exists — nothing to do.`) // pre-deploy:allow-console
     return
   }
 
@@ -153,8 +153,8 @@ async function main(): Promise<void> {
     ),
   )
 
-  console.log(`[seed] ${pieces.length} pieces for "Pedra Viva Stoneworks"`)
-  console.log(`[seed] sign in with ${DEMO_EMAIL} / ${DEMO_PASSWORD}`)
+  console.log(`[seed] ${pieces.length} pieces for "Pedra Viva Stoneworks"`) // pre-deploy:allow-console
+  console.log(`[seed] sign in with ${DEMO_EMAIL} / ${DEMO_PASSWORD}`) // pre-deploy:allow-console
 }
 
 main()

@@ -2,112 +2,131 @@
 
 Stone inventory with **provenance**: every piece records the piece it was cut from.
 
-Marble fabricators cut large stone into smaller pieces, and every cut leaves usable offcuts —
-**remnants** — that go back on the rack. The shop knows the remnants exist but not where they came
-from, so a remnant that can't be matched to a job sits until someone scraps it.
+A fabricator buys slabs and cuts jobs out of them. Every cut leaves usable offcuts — **remnants** —
+that go back on the rack. The shop knows the remnants exist but not where they came from, so a
+remnant that can't be matched to a job sits until someone scraps it.
 
 MarbleApp fixes one thing: each piece stores a `parentId`. From that single self-referencing link
-the app derives everything else — the ancestry chain (this remnant came from slab SLB-0001, sawn
-from block BLK-0001), the descendant tree, and the backlog of pieces whose origin was never
-recorded.
+the app derives everything else — the ancestry chain (this remnant came off slab SLB-0001), the
+descendant tree, and the backlog of pieces whose origin was never recorded.
 
-## Status
+## The domain model, and what it is not
 
-Frontend-only MVP. Data lives in the browser; there is no server yet. The code is deliberately
-laid out so adding a Fastify + Postgres backend is additive — see
-[Migration path](#migration-path).
+There are exactly two kinds of piece.
 
-> [!WARNING]
-> **The login is a UI gate, not security.** Everything runs client-side, so anyone with devtools
-> can read every record and edit the user list. Passwords are PBKDF2-hashed only so that the
-> hashing code and session flow relocate cleanly to a real backend. Do not put a real customer's
-> inventory in this until the API exists.
+| | |
+| --- | --- |
+| **Slab** | What the shop buys. The quarry-to-block-to-slab chain happens upstream and never reaches the yard, so a slab with no parent is normal, not missing. |
+| **Remnant** | What is left after a cut. Every one records a `remnantOrigin`: `offcut` from cutting a job, or `rejected` for a finished piece that came back. |
 
-## Getting started
+There is deliberately **no `block`** and **no `finished piece`**. Blocks are the quarry's business.
+A finished piece is fabricated for one project and delivered to the customer's house — it is never
+racked, so it is never inventory. The one exception is a job that comes back (wrong measurement,
+bad edge, damage in transit): a replacement is fabricated, and the returned piece is resold as long
+as another job can still be cut from it. That makes it a remnant, and `rejected` is how it enters.
+
+This is the correction that reshaped the app. An earlier version had four kinds; `@marble/core` →
+`migrate.ts` reads those exports into the current shape — a block becomes a slab, because deleting
+it would orphan everything beneath it and destroy exactly the provenance this app exists to keep.
+
+## Running it
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+
+createdb marble_dev
+cp .env.example .env.local        # then set DATABASE_URL and VITE_API_URL
+
+npm run db:migrate                # create the schema
+npm run db:seed                   # a demo shop — prints its credentials
 ```
 
-A demo inventory (one block → three slabs → five remnants, plus two unlinked remnants and three
-materials) is written on first load. Register any email and password to get in.
+Two processes:
 
 ```bash
-npm test           # 110 tests
-npm run typecheck
-npm run build
+npm run dev:api                   # http://localhost:3001
+npm run dev                       # http://localhost:5173
 ```
+
+```bash
+npm test                          # 462 tests
+npm run typecheck
+npm run pre-deploy                # typecheck + tests + build + env + lockfile, one verdict
+```
+
+The API suite needs a database of its own: `createdb marble_test`.
 
 ## Layout
 
-npm workspaces. One app today; `apps/api` slots in beside `apps/web` later.
+npm workspaces. Three deployables and three shared packages.
 
 ```
-packages/core/      @marble/core — ZERO framework deps, runs in browser AND node
-  types.ts          Piece / Material / User
-  tree.ts           getAncestors, getDescendants, wouldCreateCycle, recomputeSubtree
-  measure.ts        areaM2, consumptionSummary
-  codes.ts          BLK-0001 / SLB-0042 code generation
-  filter.ts         matchesFilter, isUnlinked
-  schemas.ts        zod schemas — the same objects will validate API request bodies
+packages/core/       @marble/core — ZERO framework deps. Runs in the browser AND in node.
+  types.ts           Piece / Material / Org / User
+  tree.ts            getAncestors, getDescendants, wouldCreateCycle, recomputeSubtree
+  measure.ts         areaM2, consumptionSummary
+  codes.ts           SLB-0001 / RMN-0042 code generation
+  filter.ts          matchesFilter, isUnlinked
+  schemas.ts         zod schemas — the API validates request bodies with these
+  migrate.ts         reads a v1 (four-kind) export into the current shape
+  errors.ts          DomainError, and the code → HTTP status map both ends agree on
 
-apps/web/src/
-  data/ports.ts     THE CONTRACT. Async interfaces shaped like the future REST API.
-  data/local/       localStorage (records) + IndexedDB (photos) implementations
-  data/index.ts     adapter selection — the one file migration touches
-  hooks/            TanStack Query hooks wrapping the ports
-  routes/           screens
+apps/api/            Hono + Prisma + Postgres. A standalone server: `node dist/server.js`.
+  prisma/schema.prisma   The database. Follows Piece directly.
+  src/services/      Business rules. Lineage math is imported from core, not rewritten in SQL.
+  src/routes/        HTTP. Thin — they parse, call a service, and shape a response.
+  src/photos/        Object storage: Supabase when configured, local disk when not.
+
+apps/web/            React + Vite SPA.
+  data/ports.ts      THE CONTRACT
+  data/http/         The only implementation. fetch, with the session cookie.
+  hooks/             TanStack Query hooks wrapping the ports
+  routes/            screens
+
+apps/cli/            @marble/cli — the Anthropic API chat/agent REPL
+packages/mcp-*/      MCP servers: a SQL snapshot of the inventory, and PostHog
 ```
 
 ### Key decisions
 
 | Decision | Why |
 | --- | --- |
-| Records in `localStorage`, photos in **IndexedDB** | localStorage caps near 5 MB; a dozen photos exhaust it and then throw mid-save. |
+| Two kinds, `slab` and `remnant` | It is what a shop actually handles. See above. |
+| `remnantOrigin` required on every remnant | A remnant with no origin is a row nobody can act on later. Enforced once, in `schemas.ts`, so the form and the API cannot disagree. |
 | Dimensions as integer **millimetres** | Industry convention (`3200 × 1900 × 20 mm`) and no float drift. Area is derived, in m². |
-| `rootId` + `depth` denormalized on each piece | "Everything from this block" is one filter instead of a recursive walk; becomes an indexed column in Postgres. |
+| `rootId` + `depth` denormalised on each piece | "Everything from this slab" is one indexed filter instead of a recursive walk. |
+| Lineage math in `@marble/core`, not SQL | One tested implementation of the hardest logic in the product beats two that have to agree. Costs one indexed read per reparent. |
 | Cutting a child **never** mutates the parent | Kerf loss and irregular offcuts make consumption math advisory. The app shows an estimate; the human sets the status. |
 | Reparenting is a first-class feature | The whole problem is that unlinked stone already exists. Adopting an orphan drags in cycle detection and subtree recomputation — the two most-tested functions here. |
-| A block with no parent is **not** "unlinked" | It came from a quarry. Only remnants and finished pieces genuinely lost an origin (`isUnlinked`). |
+| A slab with no parent is **not** "unlinked" | It was bought from a supplier. Only a remnant genuinely lost an origin (`isUnlinked`). |
+| Session cookie, not a token in localStorage | A token any script can read is a token an XSS bug walks off with. The cost is `SameSite=None; Secure` and explicit CORS origins. |
+| Photos in object storage, never a column | Hundreds of MB a year of data that is only ever fetched by key. Keeping it out of Postgres keeps backups fast. |
 | No graph library for the family tree | Recursive DOM with CSS connectors reflows on mobile and prints for free. |
 
-## Migration path
+## Deploying
 
-Nothing below requires touching a component.
+The two halves deploy independently.
 
-| Today | After |
-| --- | --- |
-| `packages/core` | **Unchanged.** Imported by `apps/web` and `apps/api` alike. |
-| `apps/web/src/data/ports.ts` | **Unchanged.** It is the contract. |
-| `apps/web/src/data/local/*` | Replaced by `data/http/*` — same interfaces over `fetch`. |
-| `apps/web/src/data/index.ts` | One line: return the HTTP adapter. |
-| `apps/web/src/hooks/*` | **Unchanged** — already async, already have loading/error states. |
-| — | New `apps/api`: Fastify + Postgres, validating with the same zod schemas. |
-| PBKDF2 in browser | Same derivation server-side; session record → JWT in an httpOnly cookie. |
-| IndexedDB blobs | Object storage; `hasPhoto: boolean` → `photoUrl: string \| null`. |
-| `orgId = 'org_local'` | Real orgs; every query filtered by the JWT's `orgId`. |
-| Settings → Export JSON | Seeds the first Postgres database — no data loss at cutover. |
+**Web** — a static SPA. `npm run build` → `apps/web/dist`. `vercel.json` is already set up for it.
+Set `VITE_API_URL` to the API's origin at build time.
 
-Implement the API to match this and the HTTP adapter writes itself:
+**API** — `npm run build:api` produces `apps/api/dist/server.js`, a ~45 kB bundle with
+`@marble/core` compiled in. It runs anywhere Node does: a container, a VM, Fly, Render, Railway.
+Run `npm run db:deploy` against the target database first. See `apps/api/README.md` for the full
+environment.
 
-```
-list          GET    /api/pieces?q=&kind=&status=&materialId=&rootId=
-get           GET    /api/pieces/:id
-create        POST   /api/pieces
-update        PATCH  /api/pieces/:id
-assignParent  PUT    /api/pieces/:id/parent      { parentId }
-remove        DELETE /api/pieces/:id?orphanChildren=true
-setPhoto      PUT    /api/pieces/:id/photo       (multipart)
-```
-
-Postgres follows `Piece` directly: `parent_id uuid references pieces(id)`, indexes on
-`(org_id, root_id)`, `(org_id, parent_id)`, `(org_id, status)`, unique `(org_id, code)`.
+The database is Postgres. Supabase is the intended host — it also provides the storage bucket for
+photos — but nothing in the code is specific to it beyond a connection string and a bucket name.
 
 ## Tests
 
 | Suite | Covers |
 | --- | --- |
-| `packages/core` (68) | Lineage math, cycle detection, subtree recomputation, area/consumption, code generation, filters, schema validation. |
-| `apps/web` integration (27) | The block → slab → remnant walk through the real adapters: auth, lineage, cycle rejection, orphan-on-delete, photo storage, backup round trip. |
-| `apps/web` smoke (15) | Every route mounts against seeded data — catches render-time crashes that typecheck and `vite build` cannot. |
+| `packages/core` (108) | Lineage math, cycle detection, subtree recomputation, area/consumption, code generation, filters, schema validation, the v1 backup migration. |
+| `apps/api` (36) | The real HTTP app against a real Postgres: the slab → remnant walk, code collisions under concurrency, cycle rejection, orphan-on-delete, tenant isolation, photos, backup round trip. |
+| `apps/web` (53) | Every route mounts against a seeded inventory served over a faked `fetch` — so the real HTTP adapter runs underneath, not a stub. |
+| `apps/cli` (203), `packages/mcp-*` (62) | Tool loop, retries, SQL guard, snapshot loading. |
+
+Nothing below the HTTP boundary is mocked in `apps/api`. Unique constraints, enum columns,
+`onDelete: Restrict` on the lineage relation and transaction rollback are most of what that layer
+is, and a fake would assert none of it.

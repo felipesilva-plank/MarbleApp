@@ -5,8 +5,8 @@ An MCP server that lets Claude Code run SQL against a snapshot of the MarbleApp 
 ## Why
 
 Half the questions that come up mid-feature are questions about the data, not the code. *How deep
-does lineage actually get?* *What fraction of remnants have no recorded origin?* *Is anyone
-actually using thickness as a filter?* Guessing at those is how you ship a tree view that falls
+does lineage actually get?* *What fraction of remnants have no recorded origin?* *How much of the
+sellable stock is returned jobs rather than offcuts?* Guessing at those is how you ship a tree view that falls
 over at depth 6, or spend a day on a screen nobody needed.
 
 Answering them used to mean stopping to write a throwaway script. Now the agent asks the database
@@ -14,9 +14,9 @@ while it works.
 
 ## Setup
 
-The app stores data in the browser, so the snapshot comes from a backup export.
+The snapshot is a read model built from a backup export, so it never touches production.
 
-1. In the app: **Settings → Export backup**.
+1. In the app: **Settings → Export backup** (or `GET /api/backup` with a session).
 2. Build the snapshot:
 
 ```bash
@@ -39,18 +39,20 @@ a stale one that looks current is worse than none.
 
 Resource `marble://tables` lists every table and view with its row count.
 
-## The schema is the migration target
+## The schema mirrors production
 
-`src/schema.ts` is the Postgres schema from the README's migration path, in SQLite dialect —
-`parent_id` referencing `pieces(id)`, the same four indexes, the same check constraints. A query
-that works here works against the real database after `apps/api` lands.
+`src/schema.ts` is the Prisma schema from `apps/api`, in SQLite dialect — `parent_id` referencing
+`pieces(id)`, the same indexes, the same check constraints including the one that says exactly the
+remnants carry a `remnant_origin`. A query that works here works against the real database.
+
+`loadBackup` also upgrades an export from the retired four-kind model on the way in, so an old
+snapshot still seeds a current schema.
 
 Two views encode domain rules that are easy to get wrong in ad-hoc SQL:
 
 - **`piece_areas`** — area derived from millimetres. Never stored, same as in `packages/core`.
-- **`unlinked_pieces`** — parentless *remnants and finished pieces only*. A block or slab with no
-  parent came from a quarry or a supplier; counting those as "missing an origin" inflates the
-  backlog by roughly the number of blocks you own.
+- **`unlinked_pieces`** — parentless *remnants only*. A slab with no parent was bought from a
+  supplier; counting those as "missing an origin" inflates the backlog by every slab in the yard.
 
 ## Read-only, and why it matters
 

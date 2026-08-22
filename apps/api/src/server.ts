@@ -9,7 +9,7 @@ import { env } from './env.ts'
  */
 const config = env()
 const server = serve({ fetch: createApp().fetch, port: config.PORT }, ({ port }) => {
-  console.log(`[api] listening on http://localhost:${port} (${config.NODE_ENV})`)
+  console.log(`[api] listening on http://localhost:${port} (${config.NODE_ENV})`) // pre-deploy:allow-console
 })
 
 /**
@@ -17,7 +17,7 @@ const server = serve({ fetch: createApp().fetch, port: config.PORT }, ({ port })
  * gets to finish instead of failing at the database mid-transaction.
  */
 async function shutdown(signal: string): Promise<void> {
-  console.log(`[api] ${signal} received, shutting down`)
+  console.log(`[api] ${signal} received, shutting down`) // pre-deploy:allow-console
   server.close(() => {
     void disconnect().then(() => process.exit(0))
   })

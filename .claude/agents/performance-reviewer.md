@@ -45,7 +45,8 @@ git diff origin/main...HEAD
    ```
    Report the gzip number against the previous build if you can get both.
 
-6. **Photo handling.** Photos are IndexedDB blobs. Flag any code that loads all photos at once,
+6. **Photo handling.** Photos are fetched one request at a time from the API. Flag any code that
+   loads all photos at once,
    holds data URLs in React state for a list, or forgets `URL.revokeObjectURL`.
 
 ## Output
