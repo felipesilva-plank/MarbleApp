@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { PIECE_KIND_LABELS, PIECE_STATUS_LABELS } from './types'
-import type { PieceKind, PieceStatus } from './types'
+import { PIECE_KIND_LABELS, PIECE_STATUS_LABELS, REMNANT_ORIGIN_LABELS } from './types'
+import type { PieceKind, PieceStatus, RemnantOrigin } from './types'
 
 /**
  * A saved filter is a saved **query string**, not a parsed filter object.
@@ -92,6 +92,9 @@ export function describeQuery(
 
   const kind = params.get('kind')
   if (kind) parts.push(PIECE_KIND_LABELS[kind as PieceKind] ?? kind)
+
+  const origin = params.get('origin')
+  if (origin) parts.push(REMNANT_ORIGIN_LABELS[origin as RemnantOrigin] ?? origin)
 
   const status = params.get('status')
   if (status) parts.push(PIECE_STATUS_LABELS[status as PieceStatus] ?? status)

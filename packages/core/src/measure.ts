@@ -24,9 +24,10 @@ export interface ConsumptionSummary {
   /** Parent area minus children area. Negative when over-accounted. */
   unaccountedM2: number
   /**
-   * True when children total more area than the parent. Not necessarily an error: a slab sawn
-   * from a block yields far more surface area than the block's own footprint. The UI should
-   * explain rather than alarm.
+   * True when the remnants total more area than the slab they came from — which is physically
+   * impossible, so it means a dimension was mistyped or a remnant is linked to the wrong slab.
+   * The UI flags it as something to check rather than failing the save: the person holding the
+   * tape measure is the authority, not this arithmetic.
    */
   overAccounted: boolean
   childCount: number
@@ -35,9 +36,10 @@ export interface ConsumptionSummary {
 /**
  * Advisory only. Never derive `status` from this.
  *
- * Kerf loss, irregular offcuts, and the block-to-slab surface multiplication all make the
- * arithmetic approximate. It exists to give a human a sense of "how much of this have I used",
- * not to drive state.
+ * Kerf loss and irregular offcuts make the arithmetic approximate, and the pieces actually sold
+ * to a customer are never registered — they leave for the job site instead of going on a rack —
+ * so the gap between a slab and its remnants is mostly finished work, not waste. This exists to
+ * give a human a sense of "how much of this slab is still here", not to drive state.
  */
 export function consumptionSummary(
   parent: Pick<Piece, 'lengthMm' | 'widthMm'>,

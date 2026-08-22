@@ -1,20 +1,12 @@
-import type { Piece, PieceKind, TreeNode } from './types'
-
-/**
- * What comes out of a given kind of stone, as a form default only.
- * A block is sawn into slabs; cutting a slab leaves remnants. Users can always override.
- */
-export function suggestChildKind(parentKind: PieceKind): PieceKind {
-  return parentKind === 'block' ? 'slab' : 'remnant'
-}
+import type { Piece, TreeNode } from './types'
 
 /**
  * Lineage math. This is the heart of the app: every screen that answers "where did this come
  * from?" or "what did this produce?" runs through here.
  *
  * Every traversal is defensive against cyclic data. A cycle should be impossible — `assignParent`
- * rejects them via `wouldCreateCycle` — but a corrupt import or a hand-edited localStorage blob
- * could still introduce one, and an unguarded walk would hang the render loop with no error.
+ * rejects them via `wouldCreateCycle` — but a corrupt import or a hand-edited database row could
+ * still introduce one, and an unguarded walk would hang the render loop with no error.
  */
 
 /** Depth no real stone lineage will ever reach; acts purely as a runaway guard. */

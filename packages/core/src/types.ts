@@ -1,9 +1,29 @@
 /**
- * Domain entities. Framework-free on purpose: this package is imported by the React app today
- * and by the Fastify API later, so nothing here may touch the DOM, React, or Node APIs.
+ * Domain entities. Framework-free on purpose: this package is imported by the React app and by
+ * the API server alike, so nothing here may touch the DOM, React, or Node APIs.
  */
 
-export type PieceKind = 'block' | 'slab' | 'remnant' | 'finished'
+/**
+ * The two things a fabricator actually handles.
+ *
+ * There is deliberately no `block` and no `finished piece`. A shop buys **slabs**, not blocks —
+ * the quarry-to-block-to-slab chain happens upstream and never enters this inventory. And a
+ * finished piece is fabricated for one project and delivered straight to the customer's house,
+ * so it never sits on a rack to be tracked. What is left on the floor at the end of a cut is a
+ * **remnant**, and that is the only other kind there is.
+ */
+export type PieceKind = 'slab' | 'remnant'
+
+/**
+ * How a remnant came to exist. Both routes end with stone on the rack that can still be cut.
+ *
+ * - `offcut` — the normal case: what is left of a slab after a job was cut out of it. A good day
+ *   is ~6 slabs cut, each leaving 2–3 offcuts.
+ * - `rejected` — a finished piece that came back. Wrong measurement, bad edge, damage in
+ *   transit; a replacement was fabricated and the returned piece is resold as long as another
+ *   job can still be cut from it. This is the only way a finished piece ever enters the system.
+ */
+export type RemnantOrigin = 'offcut' | 'rejected'
 
 export type PieceStatus =
   | 'available'
@@ -12,7 +32,9 @@ export type PieceStatus =
   | 'consumed'
   | 'scrapped'
 
-export const PIECE_KINDS: readonly PieceKind[] = ['block', 'slab', 'remnant', 'finished']
+export const PIECE_KINDS: readonly PieceKind[] = ['slab', 'remnant']
+
+export const REMNANT_ORIGINS: readonly RemnantOrigin[] = ['offcut', 'rejected']
 
 export const PIECE_STATUSES: readonly PieceStatus[] = [
   'available',
@@ -23,10 +45,13 @@ export const PIECE_STATUSES: readonly PieceStatus[] = [
 ]
 
 export const PIECE_KIND_LABELS: Record<PieceKind, string> = {
-  block: 'Block',
   slab: 'Slab',
   remnant: 'Remnant',
-  finished: 'Finished piece',
+}
+
+export const REMNANT_ORIGIN_LABELS: Record<RemnantOrigin, string> = {
+  offcut: 'Cut offcut',
+  rejected: 'Returned piece',
 }
 
 export const PIECE_STATUS_LABELS: Record<PieceStatus, string> = {
@@ -43,11 +68,11 @@ export const IN_STOCK_STATUSES: readonly PieceStatus[] = ['available', 'reserved
 /**
  * Kinds that, by definition, were cut from something else.
  *
- * A block arrives from a quarry and a slab may be bought finished, so having no parent is normal
- * for those. A remnant with no parent is the exact problem this app exists to fix — it is stone
- * on the rack whose origin was never written down.
+ * A slab is bought from a supplier, so having no parent is normal for one. A remnant with no
+ * parent is the exact problem this app exists to fix — stone on the rack whose origin was never
+ * written down.
  */
-export const DERIVED_KINDS: readonly PieceKind[] = ['remnant', 'finished']
+export const DERIVED_KINDS: readonly PieceKind[] = ['remnant']
 
 /**
  * One row is one physical piece of stone. There is deliberately no `quantity` field:
@@ -60,7 +85,7 @@ export interface Piece {
   code: string
 
   // --- lineage ---
-  /** null = arrived from outside (quarry/supplier), or origin genuinely unknown. */
+  /** null = bought from a supplier, or origin genuinely unknown. */
   parentId: string | null
   /** Topmost ancestor's id. Equals `id` when parentId is null. Derived — see tree.ts. */
   rootId: string
@@ -68,6 +93,8 @@ export interface Piece {
   depth: number
 
   kind: PieceKind
+  /** Set for every remnant, always null for a slab. See `RemnantOrigin`. */
+  remnantOrigin: RemnantOrigin | null
   /** Always user-controlled. Registering a child never mutates the parent's status. */
   status: PieceStatus
   materialId: string | null
@@ -78,7 +105,7 @@ export interface Piece {
   thicknessMm: number
 
   location: string
-  /** The blob itself lives outside the record (IndexedDB now, object storage later). */
+  /** The blob itself lives in object storage; the record only knows whether one exists. */
   hasPhoto: boolean
   notes: string
 
@@ -97,20 +124,28 @@ export interface Material {
   createdAt: string
 }
 
+/** A fabrication shop. Every record in the system belongs to exactly one. */
+export interface Org {
+  id: string
+  name: string
+  createdAt: string
+}
+
+export type OrgRole = 'owner' | 'member'
+
+export const ORG_ROLES: readonly OrgRole[] = ['owner', 'member']
+
+/**
+ * What the API hands back about the signed-in person. Note what is absent: no password hash and
+ * no salt. Credentials never leave the server, so they are not part of the shared entity.
+ */
 export interface User {
   id: string
   orgId: string
   email: string
   name: string
-  /** PBKDF2-SHA256. See the security note in the web app's authRepo. */
-  passwordHash: string
-  passwordSalt: string
+  role: OrgRole
   createdAt: string
-}
-
-export interface Session {
-  userId: string
-  expiresAt: string
 }
 
 export type Counters = Record<PieceKind, number>
@@ -123,6 +158,7 @@ export interface TreeNode {
 export interface PieceFilter {
   q?: string
   kind?: PieceKind | null
+  remnantOrigin?: RemnantOrigin | null
   status?: PieceStatus | null
   materialId?: string | null
   location?: string | null
@@ -132,6 +168,6 @@ export interface PieceFilter {
   minLengthMm?: number | null
   minWidthMm?: number | null
   thicknessMm?: number | null
-  /** true = only remnants/finished pieces with no recorded source. See `isUnlinked`. */
+  /** true = only remnants with no recorded source. See `isUnlinked`. */
   orphansOnly?: boolean
 }

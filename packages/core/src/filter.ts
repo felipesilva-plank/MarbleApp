@@ -3,19 +3,20 @@ import type { Piece, PieceFilter } from './types'
 
 /**
  * A piece that should have a source but has none — the untracked backlog.
- * Deliberately excludes blocks and slabs, which can legitimately have no parent.
+ * Deliberately excludes slabs, which are bought from a supplier and legitimately have no parent.
  */
 export function isUnlinked(piece: Pick<Piece, 'parentId' | 'kind'>): boolean {
   return piece.parentId === null && DERIVED_KINDS.includes(piece.kind)
 }
 
 /**
- * Pure filter predicate, shared by the localStorage adapter today and reusable for tests or an
- * in-memory API later. When Postgres arrives this becomes a WHERE clause — the shape of
- * `PieceFilter` is deliberately one-column-per-field so that translation is mechanical.
+ * Pure filter predicate. The API translates the same `PieceFilter` into a WHERE clause, and the
+ * shape is deliberately one-column-per-field so that translation stays mechanical — this
+ * function is the executable specification of what that WHERE clause must mean.
  */
 export function matchesFilter(piece: Piece, filter: PieceFilter = {}): boolean {
   if (filter.kind && piece.kind !== filter.kind) return false
+  if (filter.remnantOrigin && piece.remnantOrigin !== filter.remnantOrigin) return false
   if (filter.status && piece.status !== filter.status) return false
   if (filter.materialId && piece.materialId !== filter.materialId) return false
   if (filter.rootId && piece.rootId !== filter.rootId) return false

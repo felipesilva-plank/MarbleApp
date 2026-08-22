@@ -7,20 +7,12 @@ describe('isUnlinked', () => {
     expect(isUnlinked({ parentId: null, kind: 'remnant' })).toBe(true)
   })
 
-  it('flags a finished piece with no recorded source', () => {
-    expect(isUnlinked({ parentId: null, kind: 'finished' })).toBe(true)
-  })
-
-  it('does not flag a block — it came from a quarry, not another piece', () => {
-    expect(isUnlinked({ parentId: null, kind: 'block' })).toBe(false)
-  })
-
-  it('does not flag a slab, which may have been bought finished', () => {
+  it('does not flag a slab — it was bought from a supplier, not cut from another piece', () => {
     expect(isUnlinked({ parentId: null, kind: 'slab' })).toBe(false)
   })
 
   it('does not flag a remnant that already has a source', () => {
-    expect(isUnlinked({ parentId: 'slb1', kind: 'remnant' })).toBe(false)
+    expect(isUnlinked({ parentId: 'cutA', kind: 'remnant' })).toBe(false)
   })
 })
 
@@ -54,8 +46,13 @@ describe('matchesFilter', () => {
 
   it('filters by kind and status', () => {
     expect(matchesFilter(piece, { kind: 'remnant' })).toBe(true)
-    expect(matchesFilter(piece, { kind: 'block' })).toBe(false)
+    expect(matchesFilter(piece, { kind: 'slab' })).toBe(false)
     expect(matchesFilter(piece, { status: 'consumed' })).toBe(false)
+  })
+
+  it('filters by how the remnant came about', () => {
+    expect(matchesFilter(piece, { remnantOrigin: 'offcut' })).toBe(true)
+    expect(matchesFilter(piece, { remnantOrigin: 'rejected' })).toBe(false)
   })
 
   it('accepts a piece that only fits when rotated', () => {
@@ -80,11 +77,11 @@ describe('applyFilter', () => {
       makePiece({ id: 'lost', kind: 'remnant', parentId: null }),
     ]
     const result = applyFilter(pieces, { orphansOnly: true })
-    // 'orphan' and 'lost' are parentless remnants; the block is not counted.
+    // 'orphan' and 'lost' are parentless remnants; the slab is not counted.
     expect(result.map((p) => p.id).sort()).toEqual(['lost', 'orphan'])
   })
 
   it('narrows to one lineage by rootId', () => {
-    expect(applyFilter(fixtureTree(), { rootId: 'blk' })).toHaveLength(5)
+    expect(applyFilter(fixtureTree(), { rootId: 'slab' })).toHaveLength(5)
   })
 })
