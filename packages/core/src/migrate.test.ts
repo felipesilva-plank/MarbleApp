@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { migrateLegacyBackup, parseBackup } from './migrate'
+import { migrateLegacyBackup, parseBackup } from './migrate.ts'
 
 /** A v1 export: the block → slab → remnant chain the first MVP produced. */
 function legacyPiece(overrides: Record<string, unknown>) {

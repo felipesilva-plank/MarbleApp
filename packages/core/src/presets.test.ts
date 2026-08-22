@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeQuery, hasAnyFilter, isSameFilter, normalizeQuery, slugify } from './presets'
+import { describeQuery, hasAnyFilter, isSameFilter, normalizeQuery, slugify } from './presets.ts'
 
 describe('slugify', () => {
   it('lowercases and hyphenates', () => {

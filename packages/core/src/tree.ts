@@ -1,4 +1,4 @@
-import type { Piece, TreeNode } from './types'
+import type { Piece, TreeNode } from './types.ts'
 
 /**
  * Lineage math. This is the heart of the app: every screen that answers "where did this come

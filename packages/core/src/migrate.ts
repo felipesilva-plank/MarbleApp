@@ -1,8 +1,8 @@
 import { z } from 'zod'
-import { backupSchema, materialRecordSchema, pieceStatusSchema } from './schemas'
-import type { Backup } from './schemas'
-import { deriveCounters } from './codes'
-import type { PieceKind, RemnantOrigin } from './types'
+import { backupSchema, materialRecordSchema, pieceStatusSchema } from './schemas.ts'
+import type { Backup } from './schemas.ts'
+import { deriveCounters } from './codes.ts'
+import type { PieceKind, RemnantOrigin } from './types.ts'
 
 /**
  * Backups written before the model was corrected.

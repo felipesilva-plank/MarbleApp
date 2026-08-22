@@ -1,5 +1,5 @@
-import { DERIVED_KINDS } from './types'
-import type { Piece, PieceFilter } from './types'
+import { DERIVED_KINDS } from './types.ts'
+import type { Piece, PieceFilter } from './types.ts'
 
 /**
  * A piece that should have a source but has none — the untracked backlog.

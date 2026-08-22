@@ -1,0 +1,206 @@
+// The database behind MarbleApp.
+//
+// It follows `Piece` in @marble/core directly, because the lineage math in core operates on that
+// shape and translating between two different models would be a bug factory. The one place the
+// two deliberately differ is credentials: `passwordHash` and `passwordSalt` are columns here and
+// are absent from the shared `User` entity, so they cannot be leaked by an endpoint that forgets
+// to select fields.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// The two things a fabricator handles. See @marble/core → types.ts for why there is no `block`
+/// and no `finished`.
+enum PieceKind {
+  slab
+  remnant
+}
+
+/// How a remnant came to exist: left over from a cut, or a job that came back and can still be
+/// cut from. Enforced NOT NULL for remnants / NULL for slabs by `piece_remnant_origin_matches_kind`.
+enum RemnantOrigin {
+  offcut
+  rejected
+}
+
+enum PieceStatus {
+  available
+  reserved
+  partially_used
+  consumed
+  scrapped
+}
+
+enum OrgRole {
+  owner
+  member
+}
+
+/// A fabrication shop. Every row in every other table belongs to exactly one, and every query in
+/// the API is filtered by the org on the caller's session — there is no unscoped read.
+model Org {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(120)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users     User[]
+  materials Material[]
+  pieces    Piece[]
+  presets   FilterPreset[]
+  counters  CodeCounter[]
+
+  @@map("orgs")
+}
+
+model User {
+  id    String  @id @default(uuid()) @db.Uuid
+  orgId String  @map("org_id") @db.Uuid
+  org   Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  /// Stored lowercased. Unique across the whole system, not per org: an email identifies one
+  /// person, and letting the same address exist in two shops makes login ambiguous.
+  email String  @unique @db.VarChar(200)
+  name  String  @db.VarChar(120)
+  role  OrgRole @default(member)
+
+  /// scrypt, N=2^15. Never selected by any endpoint — see `toUser` in mappers.ts.
+  passwordHash String   @map("password_hash")
+  passwordSalt String   @map("password_salt")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  sessions      Session[]
+  createdPieces Piece[]   @relation("PieceCreatedBy")
+
+  @@index([orgId])
+  @@map("users")
+}
+
+/// Opaque server-side sessions rather than a self-contained JWT.
+///
+/// A JWT cannot be revoked before it expires, so "log out everywhere" and "disable this account"
+/// both become lies. The cost is one indexed primary-key lookup per request, which is nothing
+/// next to the queries the request is about to run anyway.
+model Session {
+  /// SHA-256 of the token in the cookie. The token itself is never stored, so a database dump
+  /// does not hand over live sessions.
+  tokenHash String   @id @map("token_hash")
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Material {
+  id     String @id @default(uuid()) @db.Uuid
+  orgId  String @map("org_id") @db.Uuid
+  org    Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name   String @db.VarChar(120)
+  color  String @default("") @db.VarChar(120)
+  finish String @default("") @db.VarChar(120)
+  notes  String @default("")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  pieces    Piece[]
+
+  /// Case-insensitive in practice: `nameFolded` carries the lowercased name so "Carrara" and
+  /// "carrara" collide at the database rather than only in whichever code path remembered to check.
+  nameFolded String @map("name_folded") @db.VarChar(120)
+
+  @@unique([orgId, nameFolded])
+  @@index([orgId])
+  @@map("materials")
+}
+
+/// One row is one physical piece of stone. No `quantity` column on purpose: two identical
+/// remnants are two rows, because they have different lineage and sit in different places.
+model Piece {
+  id    String @id @default(uuid()) @db.Uuid
+  orgId String @map("org_id") @db.Uuid
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  code  String @db.VarChar(20)
+
+  // --- lineage ---
+  /// NULL = bought from a supplier, or the origin was never recorded.
+  /// `onDelete: Restrict` is the point of the whole product: the database refuses to let a delete
+  /// silently erase where a remnant came from. The API detaches children explicitly, or fails.
+  parentId String? @map("parent_id") @db.Uuid
+  parent   Piece?  @relation("Lineage", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  children Piece[] @relation("Lineage")
+
+  /// Denormalised so "everything from this slab" is one indexed filter instead of a recursive
+  /// walk. Maintained only by `recomputeSubtree` in @marble/core — never written by hand.
+  rootId String @map("root_id") @db.Uuid
+  depth  Int    @default(0)
+
+  kind          PieceKind
+  remnantOrigin RemnantOrigin? @map("remnant_origin")
+  status        PieceStatus    @default(available)
+
+  materialId String?   @map("material_id") @db.Uuid
+  material   Material? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+
+  // Integer millimetres throughout. Industry convention: 3200 x 1900 x 20 mm.
+  lengthMm    Int @map("length_mm")
+  widthMm     Int @map("width_mm")
+  thicknessMm Int @map("thickness_mm")
+
+  location String  @default("") @db.VarChar(120)
+  /// The bytes live in object storage under `<orgId>/<pieceId>`; the row only knows one exists.
+  hasPhoto Boolean @default(false) @map("has_photo")
+  notes    String  @default("")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  createdById String   @map("created_by") @db.Uuid
+  createdBy   User     @relation("PieceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([orgId, code])
+  @@index([orgId, rootId])
+  @@index([orgId, parentId])
+  @@index([orgId, status])
+  @@index([orgId, kind])
+  @@index([orgId, materialId])
+  /// The list screen's default sort, which is every visit to the app.
+  @@index([orgId, createdAt])
+  @@map("pieces")
+}
+
+/// Per-org, per-kind high-water mark for human-readable codes (SLB-0042).
+///
+/// A separate table rather than `max(code)+1` so that generating a code is a single atomic
+/// `UPDATE ... RETURNING` inside the create transaction. Two people registering a remnant at the
+/// same moment is the ordinary case in a shop, not an edge case.
+model CodeCounter {
+  orgId String    @map("org_id") @db.Uuid
+  org   Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  kind  PieceKind
+  value Int       @default(0)
+
+  @@id([orgId, kind])
+  @@map("code_counters")
+}
+
+/// A saved filter is a saved query string, not a parsed filter object — see @marble/core →
+/// presets.ts. Params the app no longer reads are simply ignored, so a preset never breaks.
+model FilterPreset {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  org       Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name      String   @db.VarChar(40)
+  slug      String   @db.VarChar(60)
+  query     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([orgId, slug])
+  @@index([orgId])
+  @@map("filter_presets")
+}

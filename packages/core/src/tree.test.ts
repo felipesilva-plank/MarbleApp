@@ -8,8 +8,8 @@ import {
   invalidParentIds,
   recomputeSubtree,
   wouldCreateCycle,
-} from './tree'
-import { fixtureTree, makePiece } from './test-utils'
+} from './tree.ts'
+import { fixtureTree, makePiece } from './test-utils.ts'
 
 const ids = (pieces: { id: string }[]) => pieces.map((p) => p.id).sort()
 

@@ -1,4 +1,4 @@
-import type { Counters, Piece, PieceKind } from './types'
+import type { Counters, Piece, PieceKind } from './types.ts'
 
 const PREFIX: Record<PieceKind, string> = {
   slab: 'SLB',

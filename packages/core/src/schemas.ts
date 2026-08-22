@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { OrgRole, PieceKind, PieceStatus, RemnantOrigin } from './types'
+import type { OrgRole, PieceKind, PieceStatus, RemnantOrigin } from './types.ts'
 
 /**
  * Validation lives here so the exact same schemas run in the browser and inside the API server.

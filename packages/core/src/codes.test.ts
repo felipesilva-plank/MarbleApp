@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deriveCounters, emptyCounters, nextCode } from './codes'
+import { deriveCounters, emptyCounters, nextCode } from './codes.ts'
 
 describe('nextCode', () => {
   it('zero-pads to four digits with a per-kind prefix', () => {

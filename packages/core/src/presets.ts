@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { PIECE_KIND_LABELS, PIECE_STATUS_LABELS, REMNANT_ORIGIN_LABELS } from './types'
-import type { PieceKind, PieceStatus, RemnantOrigin } from './types'
+import { PIECE_KIND_LABELS, PIECE_STATUS_LABELS, REMNANT_ORIGIN_LABELS } from './types.ts'
+import type { PieceKind, PieceStatus, RemnantOrigin } from './types.ts'
 
 /**
  * A saved filter is a saved **query string**, not a parsed filter object.

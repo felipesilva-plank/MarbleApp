@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { applyFilter, isUnlinked, matchesFilter } from './filter'
-import { fixtureTree, makePiece } from './test-utils'
+import { applyFilter, isUnlinked, matchesFilter } from './filter.ts'
+import { fixtureTree, makePiece } from './test-utils.ts'
 
 describe('isUnlinked', () => {
   it('flags a remnant with no recorded source', () => {

@@ -1,0 +1,35 @@
+{
+  "name": "@marble/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "node --watch --experimental-strip-types src/server.ts",
+    "build": "esbuild src/server.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/server.js --external:@prisma/client --external:@supabase/supabase-js --external:hono --external:@hono/node-server --external:zod",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prisma": "prisma",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "node --experimental-strip-types src/seed.ts",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.15.0",
+    "@marble/core": "*",
+    "@prisma/client": "^6.16.2",
+    "@supabase/supabase-js": "^2.58.0",
+    "hono": "^4.9.9",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "prisma": "^6.16.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "esbuild": "^0.25.0"
+  }
+}

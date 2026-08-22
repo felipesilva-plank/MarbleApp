@@ -5,7 +5,7 @@ import {
   loginSchema,
   registerSchema,
   updatePieceSchema,
-} from './schemas'
+} from './schemas.ts'
 
 const validPiece = {
   kind: 'remnant',

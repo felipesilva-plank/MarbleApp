@@ -1,4 +1,4 @@
-import type { Piece, PieceKind } from './types'
+import type { Piece, PieceKind } from './types.ts'
 
 /** Test-only factory. Not exported from the package index. */
 export function makePiece(overrides: Partial<Piece> & { id: string }): Piece {

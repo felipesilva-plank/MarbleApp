@@ -1,4 +1,4 @@
-import type { Piece } from './types'
+import type { Piece } from './types.ts'
 
 /** Dimensions are integer millimetres everywhere; convert only at the display edge. */
 
