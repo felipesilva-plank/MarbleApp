@@ -30,10 +30,11 @@ function toDataUrl(bytes: Uint8Array, contentType: string): string {
 }
 
 export async function exportAll(orgId: string): Promise<Backup> {
-  const [pieceRows, materialRows, counterRows] = await Promise.all([
+  const [pieceRows, materialRows, counterRows, presetRows] = await Promise.all([
     db().piece.findMany({ where: { orgId }, orderBy: { createdAt: 'asc' } }),
     db().material.findMany({ where: { orgId }, orderBy: { name: 'asc' } }),
     db().codeCounter.findMany({ where: { orgId } }),
+    db().filterPreset.findMany({ where: { orgId }, orderBy: { createdAt: 'asc' } }),
   ])
 
   const photos: Record<string, string> = {}
@@ -66,6 +67,14 @@ export async function exportAll(orgId: string): Promise<Backup> {
     })),
     counters,
     photos,
+    presets: presetRows.map((row) => ({
+      id: row.id,
+      orgId: row.orgId,
+      name: row.name,
+      slug: row.slug,
+      query: row.query,
+      createdAt: row.createdAt.toISOString(),
+    })),
   }
 }
 
@@ -99,6 +108,7 @@ export async function importAll(
     await tx.piece.updateMany({ where: { orgId }, data: { parentId: null } })
     await tx.piece.deleteMany({ where: { orgId } })
     await tx.material.deleteMany({ where: { orgId } })
+    await tx.filterPreset.deleteMany({ where: { orgId } })
 
     if (backup.materials.length > 0) {
       await tx.material.createMany({
@@ -142,6 +152,21 @@ export async function importAll(
           // installation, and a foreign key has to point at somebody who exists here.
           createdById: userId,
         },
+      })
+    }
+
+    if (backup.presets?.length) {
+      await tx.filterPreset.createMany({
+        data: backup.presets.map((preset) => ({
+          orgId,
+          name: preset.name,
+          slug: preset.slug,
+          query: preset.query,
+          createdAt: new Date(preset.createdAt),
+        })),
+        // A file can carry two presets that slugify the same; the unique index would otherwise
+        // abort a whole inventory import over a saved filter.
+        skipDuplicates: true,
       })
     }
 

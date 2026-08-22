@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
-import { suggestChildKind } from '@marble/core'
 import type { CreatePieceInput } from '@marble/core'
 import { errorMessage, isDomainError } from '../data'
 import { useCreatePiece, useKnownLocations, usePieces, useSetPhoto } from '../hooks/usePieces'
@@ -38,6 +37,7 @@ export function PieceNew() {
   const defaultValues: CreatePieceInput = source
     ? {
         kind: source.kind,
+        remnantOrigin: source.remnantOrigin,
         status: source.status,
         parentId: source.parentId,
         materialId: source.materialId,
@@ -50,7 +50,12 @@ export function PieceNew() {
     : {
         // A piece cut from a parent inherits its material, thickness and shelf by default — it is
         // literally the same stone. The user can still change any of it.
-        kind: parent ? suggestChildKind(parent.kind) : 'slab',
+        //
+        // Anything cut from something else is a remnant: there is nothing else it could be now
+        // that slabs are bought rather than sawn on site. A returned job is the other way a
+        // remnant appears, and that is a deliberate choice rather than a default.
+        kind: parent ? 'remnant' : 'slab',
+        remnantOrigin: parent ? 'offcut' : null,
         status: 'available',
         parentId: parent?.id ?? null,
         materialId: parent?.materialId ?? null,
@@ -74,6 +79,7 @@ export function PieceNew() {
 
     capture('piece_created', {
       kind: created.kind,
+      remnant_origin: created.remnantOrigin,
       has_parent: created.parentId !== null,
       has_photo: photo !== null,
       from_duplicate: source !== null,
@@ -121,7 +127,7 @@ export function PieceNew() {
             ? 'Everything is copied except the code and the photo. It gets its own code on save.'
             : parent
               ? 'The new piece will permanently record where it came from.'
-              : 'Register stone that arrived from a supplier or quarry, or a piece whose origin you will link later.'
+              : 'Register a slab that arrived from a supplier, or a remnant whose origin you will link later.'
         }
       />
 

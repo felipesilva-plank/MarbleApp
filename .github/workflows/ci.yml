@@ -17,6 +17,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    # The API suite drives a real Postgres. There is no in-memory substitute worth having:
+    # constraints, enum columns and transaction rollback are most of what that layer is.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: marble
+          POSTGRES_PASSWORD: marble
+          POSTGRES_DB: marble_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgresql://marble:marble@localhost:5432/marble_test
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,6 +50,10 @@ jobs:
       # package.json instead of silently resolving new versions.
       - run: npm ci
 
+      # The Prisma client is generated code; nothing typechecks without it.
+      - name: Generate Prisma client
+        run: npm run db:generate --workspace @marble/api
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -38,5 +62,10 @@ jobs:
 
       # The smoke suite catches render crashes, but only a real build catches
       # a bad import path or a Tailwind class that does not survive purging.
-      - name: Build
+      - name: Build web
         run: npm run build
+
+      # The API ships as a bundle with @marble/core compiled in; a broken import
+      # only shows up here.
+      - name: Build api
+        run: npm run build:api

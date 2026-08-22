@@ -77,9 +77,10 @@ describe('remnant origin', () => {
     expect(createPieceSchema.safeParse({ ...validPiece, remnantOrigin: 'rejected' }).success).toBe(true)
   })
 
-  it('defaults a slab to no origin, and refuses one that is given', () => {
+  it('requires a slab to state that it has no origin, and refuses one that does', () => {
     const { remnantOrigin: _omitted, ...slabWithoutOrigin } = validSlab
-    expect(createPieceSchema.safeParse(slabWithoutOrigin).success).toBe(true)
+    expect(createPieceSchema.safeParse(slabWithoutOrigin).success).toBe(false)
+    expect(createPieceSchema.safeParse(validSlab).success).toBe(true)
     expect(createPieceSchema.safeParse({ ...validSlab, remnantOrigin: 'offcut' }).success).toBe(false)
   })
 

@@ -1,6 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    // @marble/core imports its own modules with explicit .ts extensions so Node can run them
+    // directly; consuming it means accepting those specifiers.
+    "allowImportingTsExtensions": true,
     "lib": ["ES2023"],
     "types": ["node"]
   },

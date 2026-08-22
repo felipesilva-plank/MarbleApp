@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { filterPresetRecordSchema } from './presets.ts'
 import type { OrgRole, PieceKind, PieceStatus, RemnantOrigin } from './types.ts'
 
 /**
@@ -69,7 +70,12 @@ function checkRemnantOrigin(
 /** The raw field set. Refined into create/update below; `.partial()` refuses a refined object. */
 const pieceFields = z.object({
   kind: pieceKindSchema,
-  remnantOrigin: remnantOriginSchema.nullable().default(null),
+  /**
+   * Explicitly nullable rather than defaulted: "this is a slab, so there is no origin" is a
+   * statement the caller should have to make. A default would also split the schema's input and
+   * output types, which react-hook-form resolves against as one.
+   */
+  remnantOrigin: remnantOriginSchema.nullable(),
   status: pieceStatusSchema,
   parentId: z.string().nullable(),
   materialId: z.string().nullable(),
@@ -161,6 +167,8 @@ export const backupSchema = z.object({
   counters: countersSchema,
   /** pieceId -> data URL. Absent when the export had no photos. */
   photos: z.record(z.string(), z.string()).optional(),
+  /** Optional so backups written before saved presets existed still import. */
+  presets: z.array(filterPresetRecordSchema).optional(),
 })
 
 export type Backup = z.infer<typeof backupSchema>

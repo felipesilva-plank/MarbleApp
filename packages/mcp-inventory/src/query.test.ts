@@ -79,10 +79,10 @@ describe('runQuery', () => {
     for (let i = 1; i <= 12; i += 1) {
       const id = `p${i}`
       db.exec(
-        `INSERT INTO pieces (id, org_id, code, parent_id, root_id, depth, kind, status, material_id,
+        `INSERT INTO pieces (id, org_id, code, parent_id, root_id, depth, kind, remnant_origin, status, material_id,
          length_mm, width_mm, thickness_mm, location, has_photo, notes, created_at, updated_at, created_by)
          VALUES ('${id}','org_local','RMN-${String(i).padStart(4, '0')}', NULL, '${id}', 0,
-         'remnant','available','m1', 1000, 500, 20, 'Rack A', 0, '',
+         'remnant','offcut','available','m1', 1000, 500, 20, 'Rack A', 0, '',
          '2026-08-01T00:00:00.000Z','2026-08-01T00:00:00.000Z','u1')`,
       )
     }
@@ -125,14 +125,26 @@ describe('runQuery', () => {
     expect(runQuery(db, 'SELECT COUNT(*) AS n FROM unlinked_pieces').rows[0]).toEqual({ n: 12 })
   })
 
-  it('does not count a parentless block as unlinked', () => {
+  it('does not count a parentless slab as unlinked', () => {
+    // A slab was bought from a supplier, so having no parent is correct rather than missing.
     db.exec(
-      `INSERT INTO pieces (id, org_id, code, parent_id, root_id, depth, kind, status, material_id,
+      `INSERT INTO pieces (id, org_id, code, parent_id, root_id, depth, kind, remnant_origin, status, material_id,
        length_mm, width_mm, thickness_mm, location, has_photo, notes, created_at, updated_at, created_by)
-       VALUES ('b1','org_local','BLK-0001', NULL, 'b1', 0, 'block','available', NULL,
-       3000, 2000, 1500, '', 0, '', '2026-08-01T00:00:00.000Z','2026-08-01T00:00:00.000Z','u1')`,
+       VALUES ('s1','org_local','SLB-0001', NULL, 's1', 0, 'slab', NULL,'available', NULL,
+       3200, 1900, 20, '', 0, '', '2026-08-01T00:00:00.000Z','2026-08-01T00:00:00.000Z','u1')`,
     )
     expect(runQuery(db, 'SELECT COUNT(*) AS n FROM unlinked_pieces').rows[0]).toEqual({ n: 12 })
+  })
+
+  it('refuses a remnant with no origin at the database level', () => {
+    expect(() =>
+      db.exec(
+        `INSERT INTO pieces (id, org_id, code, parent_id, root_id, depth, kind, remnant_origin, status, material_id,
+         length_mm, width_mm, thickness_mm, location, has_photo, notes, created_at, updated_at, created_by)
+         VALUES ('x1','org_local','RMN-9999', NULL, 'x1', 0, 'remnant', NULL,'available', NULL,
+         900, 600, 20, '', 0, '', '2026-08-01T00:00:00.000Z','2026-08-01T00:00:00.000Z','u1')`,
+      ),
+    ).toThrow()
   })
 
   it('leaves the data untouched when a write is attempted', () => {

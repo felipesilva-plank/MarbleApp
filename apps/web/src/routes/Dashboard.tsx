@@ -50,12 +50,18 @@ export function Dashboard() {
     const all: Piece[] = pieces ?? []
     const inStock = all.filter((p) => IN_STOCK_STATUSES.includes(p.status))
     const availableRemnants = all.filter((p) => p.kind === 'remnant' && p.status === 'available')
+    // Returned jobs are worth their own tile: they are whole finished pieces, far bigger than an
+    // offcut, and the easiest stock in the yard to forget is there.
+    const returned = all.filter(
+      (p) => p.remnantOrigin === 'rejected' && IN_STOCK_STATUSES.includes(p.status),
+    )
     const unlinked = all.filter(isUnlinked)
 
     return {
       total: all.length,
       inStock: inStock.length,
       availableRemnants,
+      returned,
       remnantArea: totalAreaM2(availableRemnants),
       unlinked,
       recent: [...all]
@@ -78,7 +84,7 @@ export function Dashboard() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Stat label="Pieces tracked" value={String(stats.total)} to="/pieces" />
         <Stat label="In stock" value={String(stats.inStock)} sub="Available, reserved or partly used" />
         <Stat
@@ -86,6 +92,12 @@ export function Dashboard() {
           value={String(stats.availableRemnants.length)}
           sub={`${formatArea(stats.remnantArea)} of usable stone`}
           to="/pieces?kind=remnant&status=available"
+        />
+        <Stat
+          label="Returned pieces"
+          value={String(stats.returned.length)}
+          sub="Came back from a job, still cuttable"
+          to="/pieces?kind=remnant&origin=rejected"
         />
         <Stat
           label="Materials"
@@ -143,7 +155,7 @@ export function Dashboard() {
         {stats.recent.length === 0 ? (
           <EmptyState
             title="Nothing tracked yet"
-            description="Add your first block or slab and start recording where each cut piece comes from."
+            description="Register your first slab and start recording where every remnant comes from."
             action={
               <Link to="/pieces/new">
                 <Button variant="primary">Add a piece</Button>

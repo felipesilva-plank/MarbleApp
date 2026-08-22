@@ -1,9 +1,8 @@
-import { localAuthPort } from './local/authRepo'
-import { localBackupPort } from './local/backup'
-import { localMaterialRepository } from './local/materialRepo'
-import { localPieceRepository } from './local/pieceRepo'
-import { localPresetRepository } from './local/presetRepo'
-import { seedIfEmpty } from './local/seed'
+import { httpAuthPort } from './http/authRepo'
+import { httpBackupPort } from './http/backup'
+import { httpMaterialRepository } from './http/materialRepo'
+import { httpPieceRepository } from './http/pieceRepo'
+import { httpPresetRepository } from './http/presetRepo'
 import type {
   AuthPort,
   BackupPort,
@@ -13,24 +12,19 @@ import type {
 } from './ports'
 
 /**
- * The adapter selection point. Migrating to the Fastify API is this file and nothing else:
+ * The adapter selection point.
  *
- *   export const pieces: PieceRepository = httpPieceRepository
- *
- * Nothing above this layer — hooks, routes, components — imports from ./local, so nothing above
- * it needs to change.
+ * There is exactly one implementation now: everything goes to `apps/api` over HTTP. The seam
+ * still earns its place — this file is what made replacing the browser-only storage layer a
+ * change to `data/` and nothing above it. Not one hook, route or component was touched.
  */
 
-export const pieces: PieceRepository = localPieceRepository
-export const materials: MaterialRepository = localMaterialRepository
-export const presets: PresetRepository = localPresetRepository
-export const auth: AuthPort = localAuthPort
-export const backup: BackupPort = localBackupPort
+export const pieces: PieceRepository = httpPieceRepository
+export const materials: MaterialRepository = httpMaterialRepository
+export const presets: PresetRepository = httpPresetRepository
+export const auth: AuthPort = httpAuthPort
+export const backup: BackupPort = httpBackupPort
 
-/** Local-adapter-only bootstrap; becomes a no-op once data lives on a server. */
-export function initData(): void {
-  seedIfEmpty()
-}
-
+export { API_URL } from './http/client'
 export * from './errors'
 export type * from './ports'

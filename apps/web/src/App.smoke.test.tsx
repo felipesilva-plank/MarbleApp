@@ -1,35 +1,31 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import type { Piece } from '@marble/core'
-import { initData } from './data'
-import { localAuthPort } from './data/local/authRepo'
-import { localPieceRepository } from './data/local/pieceRepo'
-import { clearPhotos } from './data/local/photos'
 import { renderApp } from './test/renderApp'
+import { signInFake, startFakeApi, stopFakeApi } from './test/fakeApi'
 
 /**
- * Render smoke tests: every route mounts against real seeded data without throwing.
+ * Render smoke tests: every route mounts against a seeded inventory without throwing.
  *
  * These catch the class of bug that typecheck and `vite build` cannot — a component that only
  * explodes once React actually renders it (bad hook order, undefined access, a missing provider).
+ *
+ * The data comes over `fetch` from `test/fakeApi`, so the real HTTP adapter runs underneath every
+ * one of these. What the server owns — constraints, transactions, one shop not seeing another's
+ * stone — is asserted in `apps/api` against a real Postgres instead.
  */
-
-async function signIn() {
-  await localAuthPort.register({
-    name: 'Ana Souza',
-    email: 'ana@yard.example',
-    password: 'stone12345',
-  })
-}
 
 let pieces: Piece[]
 
-beforeEach(async () => {
-  localStorage.clear()
-  await clearPhotos()
-  initData() // writes the demo block → slab → remnant inventory
-  pieces = await localPieceRepository.list()
+beforeEach(() => {
+  pieces = startFakeApi().pieces
 })
+
+afterEach(() => {
+  stopFakeApi()
+})
+
+const byCode = (code: string) => pieces.find((p) => p.code === code) as Piece
 
 describe('authentication gate', () => {
   it('sends a signed-out visitor to the login screen', async () => {
@@ -44,27 +40,32 @@ describe('authentication gate', () => {
 })
 
 describe('signed-in routes', () => {
-  beforeEach(signIn)
+  beforeEach(() => signInFake())
 
   it('renders the dashboard with real counts', async () => {
     renderApp('/')
 
     expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
-    expect(await screen.findByText('Pieces tracked')).toBeInTheDocument()
-    expect(await screen.findByText(String(pieces.length))).toBeInTheDocument()
+
+    // The tile, not just the label: `findAllByText` because every piece in the fixture is in
+    // stock, so the total and the in-stock count are the same number in two tiles.
+    const tile = (await screen.findByText('Pieces tracked')).closest('div') as HTMLElement
+    expect(tile).toHaveTextContent(String(pieces.length))
+    expect(await screen.findByText('Returned pieces')).toBeInTheDocument()
   })
 
   it('nudges about pieces missing their source', async () => {
     renderApp('/')
     expect(await screen.findByText('Missing their source')).toBeInTheDocument()
-    // The two seeded orphan remnants — blocks are not counted, they come from a quarry.
+    // The two parentless remnants. The two slabs are parentless too, but they were bought —
+    // they never lost an origin.
     expect(await screen.findByText('See all 2')).toBeInTheDocument()
   })
 
   it('renders the piece list', async () => {
     renderApp('/pieces')
     expect(await screen.findByRole('heading', { name: 'Pieces' })).toBeInTheDocument()
-    expect(await screen.findByText('BLK-0001')).toBeInTheDocument()
+    expect(await screen.findByText('SLB-0001')).toBeInTheDocument()
     expect(await screen.findByText('RMN-0001')).toBeInTheDocument()
   })
 
@@ -81,7 +82,7 @@ describe('signed-in routes', () => {
   })
 
   it('offers the photo control when cutting from a parent too', async () => {
-    const slab = pieces.find((p) => p.code === 'SLB-0001') as Piece
+    const slab = byCode('SLB-0001')
     renderApp(`/pieces/new?parentId=${slab.id}`)
     expect(await screen.findByRole('button', { name: /Add photo/ })).toBeInTheDocument()
   })
@@ -89,14 +90,14 @@ describe('signed-in routes', () => {
   it('does not show the photo control on the edit form', async () => {
     // Photos on an existing piece are managed from its detail page, which writes through
     // immediately rather than waiting for a save.
-    const remnant = pieces.find((p) => p.code === 'RMN-0001') as Piece
+    const remnant = byCode('RMN-0001')
     renderApp(`/pieces/${remnant.id}/edit`)
     await screen.findByRole('heading', { name: 'Edit RMN-0001' })
     expect(screen.queryByRole('button', { name: /Add photo/ })).not.toBeInTheDocument()
   })
 
   it('prefills the source when cutting from a piece', async () => {
-    const slab = pieces.find((p) => p.code === 'SLB-0001') as Piece
+    const slab = byCode('SLB-0001')
     renderApp(`/pieces/new?parentId=${slab.id}`)
 
     expect(
@@ -104,19 +105,26 @@ describe('signed-in routes', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows the full provenance chain on a remnant', async () => {
-    const remnant = pieces.find((p) => p.code === 'RMN-0001') as Piece
-    renderApp(`/pieces/${remnant.id}`)
+  it('shows the full provenance chain on a re-cut remnant', async () => {
+    // RMN-0003 was cut from RMN-0001, which came off SLB-0001 — two levels deep.
+    const recut = byCode('RMN-0003')
+    renderApp(`/pieces/${recut.id}`)
 
     const breadcrumb = await screen.findByLabelText('Provenance')
-    // This is the original problem solved: the remnant knows its slab and its block.
-    expect(breadcrumb).toHaveTextContent('BLK-0001')
+    // This is the original problem solved: the remnant knows every piece above it.
     expect(breadcrumb).toHaveTextContent('SLB-0001')
     expect(breadcrumb).toHaveTextContent('RMN-0001')
+    expect(breadcrumb).toHaveTextContent('RMN-0003')
+  })
+
+  it('marks a piece that came back from a job', async () => {
+    const returned = byCode('RMN-0004')
+    renderApp(`/pieces/${returned.id}`)
+    expect(await screen.findByText('Returned piece')).toBeInTheDocument()
   })
 
   it('says so plainly when a piece has no recorded source', async () => {
-    const orphan = pieces.find((p) => p.code === 'RMN-0006') as Piece
+    const orphan = byCode('RMN-0005')
     renderApp(`/pieces/${orphan.id}`)
 
     expect(await screen.findByText(/No source recorded/)).toBeInTheDocument()
@@ -124,7 +132,7 @@ describe('signed-in routes', () => {
   })
 
   it('lists what was cut from a slab, with the advisory consumption figure', async () => {
-    const slab = pieces.find((p) => p.code === 'SLB-0001') as Piece
+    const slab = byCode('SLB-0001')
     renderApp(`/pieces/${slab.id}`)
 
     expect(await screen.findByText('Cut from this piece')).toBeInTheDocument()
@@ -133,7 +141,7 @@ describe('signed-in routes', () => {
   })
 
   it('renders the family tree', async () => {
-    const remnant = pieces.find((p) => p.code === 'RMN-0001') as Piece
+    const remnant = byCode('RMN-0001')
     renderApp(`/pieces/${remnant.id}/tree`)
 
     expect(await screen.findByRole('heading', { name: 'Family tree' })).toBeInTheDocument()
@@ -141,7 +149,7 @@ describe('signed-in routes', () => {
   })
 
   it('renders the edit form', async () => {
-    const remnant = pieces.find((p) => p.code === 'RMN-0001') as Piece
+    const remnant = byCode('RMN-0001')
     renderApp(`/pieces/${remnant.id}/edit`)
     expect(await screen.findByRole('heading', { name: 'Edit RMN-0001' })).toBeInTheDocument()
   })
@@ -152,9 +160,10 @@ describe('signed-in routes', () => {
     expect(await screen.findByText('Carrara White')).toBeInTheDocument()
   })
 
-  it('renders settings with storage counts', async () => {
+  it('renders settings, naming the shop the data belongs to', async () => {
     renderApp('/settings')
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+    expect(await screen.findByText('Pedra Viva Stoneworks')).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /Export backup/ })).toBeInTheDocument()
   })
 

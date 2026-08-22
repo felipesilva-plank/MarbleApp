@@ -5,12 +5,14 @@ import {
   PIECE_KIND_LABELS,
   PIECE_STATUSES,
   PIECE_STATUS_LABELS,
+  REMNANT_ORIGINS,
+  REMNANT_ORIGIN_LABELS,
   areaM2,
   formatArea,
   formatDimensions,
   isUnlinked,
 } from '@marble/core'
-import type { PieceFilter, PieceKind, PieceStatus } from '@marble/core'
+import type { PieceFilter, PieceKind, PieceStatus, RemnantOrigin } from '@marble/core'
 import { toCsvFile } from '@marble/core'
 import type { FilterPreset } from '@marble/core'
 import { errorMessage } from '../data'
@@ -22,7 +24,7 @@ import { capture } from '../lib/analytics'
 import { downloadText } from '../lib/download'
 import { pieceCsvColumns, pieceCsvLookups } from '../lib/pieceCsv'
 import { PresetBar } from '../components/PresetBar'
-import { KindBadge, OrphanBadge, StatusBadge } from '../components/badges'
+import { KindBadge, OrphanBadge, RemnantOriginBadge, StatusBadge } from '../components/badges'
 import { PieceThumb } from '../components/PieceThumb'
 import {
   Button,
@@ -53,6 +55,7 @@ export function PieceList() {
     () => ({
       q: params.get('q') ?? undefined,
       kind: (params.get('kind') as PieceKind | null) || null,
+      remnantOrigin: (params.get('origin') as RemnantOrigin | null) || null,
       status: (params.get('status') as PieceStatus | null) || null,
       materialId: params.get('material') || null,
       orphansOnly: params.get('unlinked') === '1',
@@ -120,9 +123,16 @@ export function PieceList() {
     setParams(next, { replace: true })
   }
 
-  const activeFilterCount = ['kind', 'status', 'material', 'unlinked', 'minL', 'minW', 't'].filter(
-    (key) => params.get(key),
-  ).length
+  const activeFilterCount = [
+    'kind',
+    'origin',
+    'status',
+    'material',
+    'unlinked',
+    'minL',
+    'minW',
+    't',
+  ].filter((key) => params.get(key)).length
 
   const totalArea = results.reduce((sum, piece) => sum + areaM2(piece), 0)
 
@@ -195,6 +205,25 @@ export function PieceList() {
               {PIECE_KINDS.map((kind) => (
                 <option key={kind} value={kind}>
                   {PIECE_KIND_LABELS[kind]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field
+            label="Remnant origin"
+            htmlFor="origin"
+            hint="Only applies to remnants."
+          >
+            <Select
+              id="origin"
+              value={params.get('origin') ?? ''}
+              onChange={(event) => setParam('origin', event.target.value)}
+            >
+              <option value="">Any origin</option>
+              {REMNANT_ORIGINS.map((origin) => (
+                <option key={origin} value={origin}>
+                  {REMNANT_ORIGIN_LABELS[origin]}
                 </option>
               ))}
             </Select>
@@ -315,6 +344,7 @@ export function PieceList() {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="font-medium text-stone-900">{piece.code}</span>
                     <KindBadge kind={piece.kind} />
+                    {piece.remnantOrigin ? <RemnantOriginBadge origin={piece.remnantOrigin} /> : null}
                     <StatusBadge status={piece.status} />
                     {isUnlinked(piece) ? <OrphanBadge /> : null}
                   </div>
@@ -353,6 +383,9 @@ export function PieceList() {
                           <span className="flex flex-wrap items-center gap-1.5">
                             <span className="font-medium text-stone-900">{piece.code}</span>
                             <KindBadge kind={piece.kind} />
+                            {piece.remnantOrigin ? (
+                              <RemnantOriginBadge origin={piece.remnantOrigin} />
+                            ) : null}
                             {isUnlinked(piece) ? <OrphanBadge /> : null}
                           </span>
                         </span>

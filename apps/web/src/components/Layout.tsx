@@ -104,8 +104,8 @@ export function Layout() {
 
       <footer className="mx-auto max-w-6xl px-4 pb-10">
         <p className="text-xs text-stone-400">
-          Demo build — all data is stored in this browser only. Press{' '}
-          <kbd className="rounded border border-stone-300 px-1 font-mono">?</kbd> for shortcuts.
+          Press <kbd className="rounded border border-stone-300 px-1 font-mono">?</kbd> for
+          shortcuts.
         </p>
       </footer>
 

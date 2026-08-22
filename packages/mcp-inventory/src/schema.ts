@@ -1,10 +1,9 @@
 /**
  * The relational shape MarbleApp's data takes once it stops being JSON in a browser.
  *
- * This is not a convenience for the MCP server - it is the Postgres schema from the README's
- * migration path, written in SQLite dialect. Keeping them the same means a question the agent
- * answers against this database ("how many remnants have no recorded origin?") is answered by the
- * same SQL after the backend lands.
+ * This is not a convenience for the MCP server - it mirrors the Prisma schema in apps/api, in
+ * SQLite dialect. Keeping them the same means a question the agent answers against this snapshot
+ * ("how many remnants have no recorded origin?") is answered by the same SQL against production.
  */
 
 export const SCHEMA_SQL = `
@@ -25,7 +24,10 @@ CREATE TABLE pieces (
   parent_id     TEXT REFERENCES pieces(id),
   root_id       TEXT NOT NULL,
   depth         INTEGER NOT NULL,
-  kind          TEXT NOT NULL CHECK (kind IN ('block','slab','remnant','finished')),
+  kind          TEXT NOT NULL CHECK (kind IN ('slab','remnant')),
+  /* NOT NULL for a remnant, NULL for a slab. The pairing is a constraint rather than a
+     convention because a remnant with no origin is a row nobody can act on later. */
+  remnant_origin TEXT CHECK (remnant_origin IN ('offcut','rejected')),
   status        TEXT NOT NULL CHECK (status IN ('available','reserved','partially_used','consumed','scrapped')),
   material_id   TEXT REFERENCES materials(id),
   length_mm     INTEGER NOT NULL,
@@ -36,13 +38,16 @@ CREATE TABLE pieces (
   notes         TEXT NOT NULL DEFAULT '',
   created_at    TEXT NOT NULL,
   updated_at    TEXT NOT NULL,
-  created_by    TEXT NOT NULL
+  created_by    TEXT NOT NULL,
+  /* A table-level constraint because it spans two columns: exactly the remnants carry an origin. */
+  CHECK ((kind = 'remnant') = (remnant_origin IS NOT NULL))
 );
 
 CREATE UNIQUE INDEX pieces_org_code   ON pieces (org_id, code);
 CREATE        INDEX pieces_org_root   ON pieces (org_id, root_id);
 CREATE        INDEX pieces_org_parent ON pieces (org_id, parent_id);
 CREATE        INDEX pieces_org_status ON pieces (org_id, status);
+CREATE        INDEX pieces_org_kind   ON pieces (org_id, kind);
 
 CREATE TABLE filter_presets (
   id          TEXT PRIMARY KEY,
@@ -60,22 +65,24 @@ CREATE VIEW piece_areas AS
     p.id,
     p.code,
     p.kind,
+    p.remnant_origin,
     p.status,
     ROUND((p.length_mm / 1000.0) * (p.width_mm / 1000.0), 4) AS area_m2
   FROM pieces p;
 
-/* Remnants and finished pieces with no parent: the backlog this whole app exists to shrink.
-   Blocks and slabs are excluded on purpose - they arrived from a quarry or a supplier, so having
-   no parent is correct rather than missing. */
+/* Remnants with no parent: the backlog this whole app exists to shrink. Slabs are excluded on
+   purpose - one was bought from a supplier, so having no parent is correct rather than missing. */
 CREATE VIEW unlinked_pieces AS
   SELECT * FROM pieces
-  WHERE parent_id IS NULL AND kind IN ('remnant', 'finished');
+  WHERE parent_id IS NULL AND kind = 'remnant';
 `
 
 /** Column comments, surfaced by describe-table. SQLite has no COMMENT ON. */
 export const COLUMN_NOTES: Record<string, Record<string, string>> = {
   pieces: {
-    parent_id: 'The piece this one was cut from. NULL means it arrived from outside, or its origin was never recorded.',
+    parent_id: 'The piece this one was cut from. NULL means it was bought from a supplier, or its origin was never recorded.',
+    kind: "'slab' or 'remnant'. There is no block (that is the quarry's business) and no finished piece (those are delivered to the customer, not racked).",
+    remnant_origin: "'offcut' from a cut, or 'rejected' for a job that came back and can still be cut from. NULL for a slab.",
     root_id: 'Topmost ancestor. Equals id when parent_id is NULL. Derived - never set by hand.',
     depth: '0 at the root. Derived alongside root_id.',
     length_mm: 'Integer millimetres. Industry convention; area in m2 is derived, see the piece_areas view.',

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { backupSchema, materialRecordSchema, pieceStatusSchema } from './schemas.ts'
+import { filterPresetRecordSchema } from './presets.ts'
 import type { Backup } from './schemas.ts'
 import { deriveCounters } from './codes.ts'
 import type { PieceKind, RemnantOrigin } from './types.ts'
@@ -48,6 +49,7 @@ const legacyBackupSchema = z.object({
     finished: z.number().int().min(0),
   }),
   photos: z.record(z.string(), z.string()).optional(),
+  presets: z.array(filterPresetRecordSchema).optional(),
 })
 
 type LegacyKind = z.infer<typeof legacyKindSchema>
@@ -87,6 +89,7 @@ export function migrateLegacyBackup(input: unknown): Backup | null {
     // those keys no longer exist.
     counters: deriveCounters(pieces),
     photos: legacy.data.photos,
+    presets: legacy.data.presets,
   }
 }
 

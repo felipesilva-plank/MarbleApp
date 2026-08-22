@@ -15,6 +15,12 @@ export interface AnalyticsEvents {
   piece_created: {
     kind: string
     /**
+     * 'offcut' | 'rejected' | null. Worth splitting: a returned job is a much larger piece than
+     * an offcut, and if the marketplace idea is the one with traction, knowing how much of the
+     * sellable stock arrives each way is the number that sizes it.
+     */
+    remnant_origin: string | null
+    /**
      * Whether the origin was recorded at creation. The core metric - this whole app is a bet that
      * making lineage easy raises this number.
      */

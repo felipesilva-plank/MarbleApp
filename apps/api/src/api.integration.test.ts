@@ -371,7 +371,7 @@ describe('photos', () => {
 
   async function upload(client: TestClient, id: string, type = 'image/png'): Promise<Response> {
     const form = new FormData()
-    form.set('photo', new File([PNG as BlobPart], 'piece.png', { type }))
+    form.set('photo', new File([PNG], 'piece.png', { type }))
     return client.request(`/api/pieces/${id}/photo`, { method: 'PUT', body: form })
   }
 
@@ -436,7 +436,7 @@ describe('backup', () => {
     await client.ok('/api/pieces', 'POST', remnantInput(slab.id))
 
     const form = new FormData()
-    form.set('photo', new File([new Uint8Array([1, 2, 3]) as BlobPart], 'p.png', { type: 'image/png' }))
+    form.set('photo', new File([new Uint8Array([1, 2, 3])], 'p.png', { type: 'image/png' }))
     await client.request(`/api/pieces/${slab.id}/photo`, { method: 'PUT', body: form })
 
     const exported = await client.ok<Record<string, unknown>>('/api/backup')

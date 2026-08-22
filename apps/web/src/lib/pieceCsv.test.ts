@@ -12,6 +12,7 @@ function piece(overrides: Partial<Piece> = {}): Piece {
     rootId: 'p1',
     depth: 0,
     kind: 'remnant',
+    remnantOrigin: 'offcut',
     status: 'available',
     materialId: null,
     lengthMm: 1200,
@@ -50,24 +51,31 @@ describe('piece CSV export', () => {
   })
 
   it('resolves a parent that is outside the exported rows', () => {
-    const parent = piece({ id: 'p0', code: 'BLK-0001' })
+    const parent = piece({ id: 'p0', code: 'SLB-0004', kind: 'slab', remnantOrigin: null })
     const child = piece({ id: 'p1', parentId: 'p0', depth: 1 })
     // Only the child is exported, but the lookup gets the full inventory.
-    expect(build([child], [parent, child])).toContain(',BLK-0001,')
+    expect(build([child], [parent, child])).toContain(',SLB-0004,')
   })
 
   it('leaves "Cut from" blank when the parent was deleted', () => {
     const orphaned = piece({ parentId: 'gone' })
     const line = build([orphaned]).split('\r\n')[1]
-    expect(line.split(',')[9]).toBe('')
+    // Column 10 is "Cut from"; "Remnant origin" sits at 2 and shifts everything after it.
+    expect(line.split(',')[10]).toBe('')
   })
 
   it('marks a parentless remnant as having no recorded origin', () => {
     expect(build([piece({ kind: 'remnant', parentId: null })])).toContain(',no,')
   })
 
-  it('does not mark a parentless block as missing an origin', () => {
-    expect(build([piece({ kind: 'block', parentId: null })])).toContain(',yes,')
+  it('does not mark a parentless slab as missing an origin', () => {
+    // A slab was bought from a supplier. It never had a piece above it to lose.
+    expect(build([piece({ kind: 'slab', remnantOrigin: null, parentId: null })])).toContain(',yes,')
+  })
+
+  it('names how a remnant came about, and leaves the column blank for a slab', () => {
+    expect(build([piece({ remnantOrigin: 'rejected' })])).toContain('Returned piece')
+    expect(build([piece({ kind: 'slab', remnantOrigin: null })])).toContain('Slab,,')
   })
 
   it('keeps accented material names intact behind the BOM', () => {

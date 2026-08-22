@@ -4,20 +4,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router'
 import { App } from './App'
 import { AuthProvider } from './auth/AuthContext'
-import { initData } from './data'
 import './index.css'
-
-// Writes the demo inventory on first run. No-op afterwards, and a no-op entirely once data
-// lives on a server.
-initData()
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Local reads are instant and always fresh, so refetching on focus is pure noise.
-      refetchOnWindowFocus: false,
+      // Reads cross the network now. Coming back to a tab is exactly when a rack that someone
+      // else has changed should be re-checked, so refetching on focus is worth the request.
+      refetchOnWindowFocus: true,
+      // A failed write must not be replayed: retrying a create would register the piece twice.
+      // Reads are re-run by the query above rather than by a retry policy.
       retry: false,
-      staleTime: 0,
+      // Long enough that clicking through a list and back does not re-request every row.
+      staleTime: 30_000,
     },
   },
 })
