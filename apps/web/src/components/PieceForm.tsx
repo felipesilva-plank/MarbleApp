@@ -5,6 +5,8 @@ import {
   PIECE_KIND_LABELS,
   PIECE_STATUSES,
   PIECE_STATUS_LABELS,
+  REMNANT_ORIGINS,
+  REMNANT_ORIGIN_LABELS,
   areaM2,
   createPieceSchema,
   formatArea,
@@ -56,6 +58,7 @@ export function PieceForm({
   })
 
   const parentId = watch('parentId')
+  const kind = watch('kind')
   const lengthMm = watch('lengthMm')
   const widthMm = watch('widthMm')
 
@@ -69,8 +72,25 @@ export function PieceForm({
       <Card className="p-5">
         <SectionTitle>Stone</SectionTitle>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Type" error={errors.kind?.message} htmlFor="kind">
-            <Select id="kind" {...register('kind')}>
+          <Field
+            label="Type"
+            error={errors.kind?.message}
+            htmlFor="kind"
+            hint="A slab is what you buy. Anything left after a cut is a remnant."
+          >
+            <Select
+              id="kind"
+              {...register('kind', {
+                // Switching to a slab has to drop the origin, and switching to a remnant has to
+                // ask for one — the schema rejects a piece that carries the wrong pairing, and a
+                // stale hidden value would fail validation with the field out of sight.
+                onChange: (event: { target: { value: string } }) => {
+                  setValue('remnantOrigin', event.target.value === 'remnant' ? 'offcut' : null, {
+                    shouldValidate: true,
+                  })
+                },
+              })}
+            >
               {PIECE_KINDS.map((kind) => (
                 <option key={kind} value={kind}>
                   {PIECE_KIND_LABELS[kind]}
@@ -78,6 +98,26 @@ export function PieceForm({
               ))}
             </Select>
           </Field>
+
+          {kind === 'remnant' ? (
+            <Field
+              label="Where it came from"
+              error={errors.remnantOrigin?.message}
+              htmlFor="remnantOrigin"
+              hint="A returned piece is usually much bigger than an offcut — worth being able to filter for."
+            >
+              <Select id="remnantOrigin" {...register('remnantOrigin')}>
+                {REMNANT_ORIGINS.map((origin) => (
+                  <option key={origin} value={origin}>
+                    {REMNANT_ORIGIN_LABELS[origin]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : (
+            // Registered so the schema always sees the field; a slab must submit an explicit null.
+            <input type="hidden" {...register('remnantOrigin')} value="" />
+          )}
 
           <Field
             label="Status"
@@ -208,7 +248,7 @@ export function PieceForm({
                 <span className="font-medium text-stone-900">{parent.code}</span>.
               </>
             ) : (
-              'Leave this empty if the stone came from a supplier, or if you genuinely do not know its origin — you can link it later.'
+              'Leave this empty for a slab bought from a supplier, or for stone whose origin you genuinely do not know — you can link it later.'
             )}
           </p>
           <input type="hidden" {...register('parentId')} />

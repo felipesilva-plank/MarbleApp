@@ -29,16 +29,25 @@ Complexity is **S** (one sitting, one PR) or **M** (needs a spec file in `docs/s
 | MAR-27 | Warn before leaving a dirty form | S | no | Given unsaved edits, when the user navigates away, then a confirm appears. No warning for an untouched form. |
 | MAR-28 | Filter chip row | S | yes | Active filters render as removable chips above the list, with a "Clear all". |
 
-## Blocked on the API
+## Unblocked by `apps/api`
 
-Not startable while everything is client-side. Listed so nobody re-tickets them.
-
-| ID | Title | Blocked by |
+| ID | Title | State |
 | --- | --- | --- |
-| MAR-30 | Real authentication | `apps/api` |
-| MAR-31 | Multi-user org with roles | `apps/api` |
-| MAR-32 | Photo upload to object storage | `apps/api` |
-| MAR-33 | Audit log of lineage edits | `apps/api` |
+| MAR-30 | Real authentication | **Done.** Server-side sessions, scrypt, httpOnly cookie. |
+| MAR-31 | Multi-user org with roles | **Partly.** Orgs and an `owner`/`member` role exist and scope every query. What is missing is inviting a second person — there is no way to add a member to a shop today. |
+| MAR-32 | Photo upload to object storage | **Done.** Keyed `<orgId>/<pieceId>`; Supabase Storage in production, local disk in development. |
+| MAR-33 | Audit log of lineage edits | Startable. `assignParent` already returns every piece that moved, which is the event to record. |
+
+## What the customer feedback says to build next
+
+From the validation round with a fabricator in the US, in the order the interest ran:
+
+| ID | Title | Why |
+| --- | --- | --- |
+| MAR-34 | Marketplace: list stone to other shops | The item that generated the most interest by a distance. Two nearby cities hold more than ten shops, most of them small, and a subscription that shows them stone they do not own is the argument for paying at all. Needs a per-piece "listed" flag, a cross-org search that respects it, and a contact path — none of which exist. |
+| MAR-35 | Subscription and plan gating | Validated range is US$150–300/month against a competitor at US$500. Blocked on something the code cannot fix: US payment collection cannot depend on a single partner (see the KYC note in the validation write-up). |
+| MAR-36 | Material → texture/colour reference | The fabricator answered this on video; the list has not been transcribed into `materials` yet. |
+| MAR-37 | Fast entry for a day's cutting | A good day is ~6 slabs cut, each leaving 2–3 remnants. That is up to 24 records typed one form at a time. Registering a slab's offcuts in one pass is the difference between the app being used and being abandoned. |
 
 ## How to pick one up
 

@@ -1,16 +1,14 @@
-import type { Counters, Piece, PieceKind } from './types'
+import type { Counters, Piece, PieceKind } from './types.ts'
 
 const PREFIX: Record<PieceKind, string> = {
-  block: 'BLK',
   slab: 'SLB',
   remnant: 'RMN',
-  finished: 'FIN',
 }
 
 const CODE_PATTERN = /^([A-Z]{3})-(\d+)$/
 
 export function emptyCounters(): Counters {
-  return { block: 0, slab: 0, remnant: 0, finished: 0 }
+  return { slab: 0, remnant: 0 }
 }
 
 /**

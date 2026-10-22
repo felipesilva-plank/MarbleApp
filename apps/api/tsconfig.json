@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@marble/core": ["../../packages/core/src/index.ts"]
+    },
+    // Relative imports carry a `.ts` extension so Node can run `src/server.ts` directly during
+    // development; esbuild resolves the same specifiers when bundling for deploy.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "prisma.config.ts", "vitest.config.ts"]
+}

@@ -25,6 +25,7 @@ export function PieceEdit() {
 
   const defaultValues: CreatePieceInput = {
     kind: piece.kind,
+    remnantOrigin: piece.remnantOrigin,
     status: piece.status,
     parentId: piece.parentId,
     materialId: piece.materialId,

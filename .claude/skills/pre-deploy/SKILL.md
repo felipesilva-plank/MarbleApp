@@ -17,10 +17,10 @@ Add `--fix-hints` for a suggested command per failure, or `--json` for machine-r
 
 | Check | Fails when | Why it is here |
 | --- | --- | --- |
-| Typecheck | `tsc --noEmit` errors in either workspace | - |
-| Tests | Any vitest suite fails | - |
+| Typecheck | `tsc --noEmit` errors in any workspace | Needs the generated Prisma client — run `npm run db:generate` if it has never been generated |
+| Tests | Any vitest suite fails | The API suite needs a real Postgres: `createdb marble_test`, or set `TEST_DATABASE_URL` |
 | Build | `vite build` errors | Catches bad import paths and purged Tailwind classes that typecheck cannot see |
-| `console.log` | Any `console.log`/`debug`/`dir`/`table`/`trace` in `apps/*/src` or `packages/*/src`, excluding tests | Debug output shipped to production leaks inventory data into a customer's devtools |
+| `console.log` | Any `console.log`/`debug`/`dir`/`table`/`trace` in `apps/web/src`, `apps/api/src` or `packages/core/src`, excluding tests | Debug output shipped to production leaks inventory data into a customer's devtools, or a shop's rows into a server log |
 | Env vars | A name in `.env.example` is absent from both the environment and `.env.local` | The app dies on first load instead of at build time |
 | Lockfile | A `package.json` changed without `package-lock.json` | `npm ci` in CI fails on drift |
 

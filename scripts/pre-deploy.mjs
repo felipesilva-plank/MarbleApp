@@ -23,7 +23,7 @@ const args = new Set(process.argv.slice(2))
 const WANT_HINTS = args.has('--fix-hints')
 const AS_JSON = args.has('--json')
 
-const SOURCE_ROOTS = ['apps/web/src', 'packages/core/src']
+const SOURCE_ROOTS = ['apps/web/src', 'apps/api/src', 'packages/core/src']
 const SOURCE_EXTS = new Set(['.ts', '.tsx', '.mts', '.js', '.jsx'])
 
 /** Debug leftovers. warn/error are deliberate signals and stay allowed. */

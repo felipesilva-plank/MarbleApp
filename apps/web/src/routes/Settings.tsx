@@ -1,14 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { backup, errorMessage } from '../data'
 import { usePieces } from '../hooks/usePieces'
 import { useMaterials } from '../hooks/useMaterials'
 import { capture } from '../lib/analytics'
-import { StorageMeter } from '../components/StorageMeter'
+import { useOrg } from '../hooks/useOrg'
 import { buildInfo } from '../lib/buildInfo'
 import { formatDate } from '../lib/format'
-import { storageUsage } from '../lib/storage'
-import type { StorageUsage } from '../lib/storage'
+import { API_URL } from '../data'
 import { Alert, Button, Card, Modal, PageHeader, SectionTitle, Spinner } from '../components/ui'
 
 function downloadJson(filename: string, contents: string) {
@@ -25,28 +24,16 @@ export function Settings() {
   const queryClient = useQueryClient()
   const { data: pieces } = usePieces()
   const { data: materials } = useMaterials()
+  const { data: org } = useOrg()
 
   const fileRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [pendingImport, setPendingImport] = useState<string | null>(null)
-  const [usage, setUsage] = useState<StorageUsage | null>(null)
 
   const photoCount = (pieces ?? []).filter((p) => p.hasPhoto).length
   const build = buildInfo()
-
-  // Re-measure whenever the inventory changes: an import is exactly when someone wants to know
-  // whether they just filled the browser up.
-  useEffect(() => {
-    let cancelled = false
-    void storageUsage().then((next) => {
-      if (!cancelled) setUsage(next)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [pieces, materials])
 
   async function handleExport() {
     setBusy(true)
@@ -104,7 +91,7 @@ export function Settings() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Settings" subtitle="Back up and restore your inventory." />
+      <PageHeader title="Settings" subtitle="Your shop, and your data." />
 
       {error ? (
         <div className="mb-6">
@@ -118,11 +105,11 @@ export function Settings() {
       ) : null}
 
       <Card className="mb-6 p-5">
-        <SectionTitle>This browser holds everything</SectionTitle>
+        <SectionTitle>{org?.name ?? 'Your shop'}</SectionTitle>
         <p className="text-sm text-stone-600">
-          There is no server yet. Your inventory lives in this browser, on this device — clearing
-          site data, switching browsers, or using a different computer means starting over. Export
-          a backup regularly.
+          Your inventory lives on the server, not in this browser. Anyone you add to{' '}
+          {org?.name ?? 'your shop'} sees the same racks from their own device, and no other shop
+          can see any of it.
         </p>
         <dl className="mt-4 grid grid-cols-3 gap-4 text-center">
           <div className="rounded-lg bg-stone-100 py-3">
@@ -138,18 +125,13 @@ export function Settings() {
             <dd className="text-xl font-semibold text-stone-900">{photoCount}</dd>
           </div>
         </dl>
-        {usage ? (
-          <div className="mt-5 border-t border-stone-200 pt-4">
-            <StorageMeter usage={usage} />
-          </div>
-        ) : null}
       </Card>
 
       <Card className="mb-6 p-5">
         <SectionTitle>Export</SectionTitle>
         <p className="mb-4 text-sm text-stone-600">
-          Downloads every piece, material and photo as a single JSON file. Keep it somewhere safe —
-          it is also what will seed the real database once the backend exists.
+          Downloads every piece, material and photo as a single JSON file. Your data is yours:
+          this is the whole of it, in a format you can read without us.
         </p>
         <Button variant="primary" onClick={() => void handleExport()} disabled={busy}>
           {busy ? <Spinner /> : null}
@@ -160,9 +142,9 @@ export function Settings() {
       <Card className="p-5">
         <SectionTitle>Import</SectionTitle>
         <p className="mb-4 text-sm text-stone-600">
-          Restores from a backup file.{' '}
+          Restores from a backup file, including one exported by the older browser-only version.{' '}
           <span className="font-medium text-stone-800">
-            This replaces everything currently stored
+            This replaces everything in {org?.name ?? 'your shop'}
           </span>{' '}
           — export first if you are not sure.
         </p>
@@ -181,8 +163,8 @@ export function Settings() {
       <Card className="mt-6 p-5">
         <SectionTitle>Build</SectionTitle>
         <p className="mb-4 text-sm text-stone-600">
-          Which build this tab is running. Worth checking before reporting something odd — this app
-          keeps its data locally, so tabs stay open across deploys.
+          Which build this tab is running, and which API it is talking to. Worth checking before
+          reporting something odd.
         </p>
         <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
           <dt className="text-stone-500">Version</dt>
@@ -191,6 +173,8 @@ export function Settings() {
           <dd className="font-mono text-stone-900">{build.commit}</dd>
           <dt className="text-stone-500">Built</dt>
           <dd className="text-stone-900">{build.builtAt ? formatDate(build.builtAt) : '—'}</dd>
+          <dt className="text-stone-500">API</dt>
+          <dd className="font-mono break-all text-stone-900">{API_URL}</dd>
         </dl>
       </Card>
 

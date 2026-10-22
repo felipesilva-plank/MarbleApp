@@ -16,7 +16,7 @@ export function ParentPicker({
   excludeIds,
   value,
   onChange,
-  emptyLabel = 'No source — arrived from a supplier, or the origin is unknown',
+  emptyLabel = 'No source — bought from a supplier, or the origin is unknown',
 }: {
   pieces: Piece[]
   excludeIds: Set<string>

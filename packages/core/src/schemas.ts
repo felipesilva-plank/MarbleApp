@@ -1,13 +1,16 @@
 import { z } from 'zod'
-import { filterPresetRecordSchema } from './presets'
-import type { PieceKind, PieceStatus } from './types'
+import { filterPresetRecordSchema } from './presets.ts'
+import type { OrgRole, PieceKind, PieceStatus, RemnantOrigin } from './types.ts'
 
 /**
- * Validation lives here so the exact same schemas run in the browser today and inside Fastify
- * later. When the API arrives it validates request bodies with these objects unchanged.
+ * Validation lives here so the exact same schemas run in the browser and inside the API server.
+ * The API parses request bodies with these objects; a form that validated the same rule
+ * separately would be a second source of truth waiting to drift.
  */
 
-export const pieceKindSchema = z.enum(['block', 'slab', 'remnant', 'finished'])
+export const pieceKindSchema = z.enum(['slab', 'remnant'])
+export const remnantOriginSchema = z.enum(['offcut', 'rejected'])
+export const orgRoleSchema = z.enum(['owner', 'member'])
 export const pieceStatusSchema = z.enum([
   'available',
   'reserved',
@@ -18,8 +21,12 @@ export const pieceStatusSchema = z.enum([
 
 // Compile-time guard: these must stay in lockstep with the unions in types.ts.
 const _kindsMatch: PieceKind = null as unknown as z.infer<typeof pieceKindSchema>
+const _originsMatch: RemnantOrigin = null as unknown as z.infer<typeof remnantOriginSchema>
+const _rolesMatch: OrgRole = null as unknown as z.infer<typeof orgRoleSchema>
 const _statusesMatch: PieceStatus = null as unknown as z.infer<typeof pieceStatusSchema>
 void _kindsMatch
+void _originsMatch
+void _rolesMatch
 void _statusesMatch
 
 /** 20 m is longer than any stone that has ever been quarried; a sanity bound, not a business rule. */
@@ -35,8 +42,40 @@ const thicknessField = z
   .positive('Must be greater than zero')
   .max(5_000, 'Must be 5000 mm or less')
 
-export const createPieceSchema = z.object({
+/**
+ * `remnantOrigin` is the one cross-field rule in the domain, so it is enforced once, here, rather
+ * than in the form and again in the API. A remnant without an origin is a record nobody can act
+ * on later; a slab with one is a contradiction.
+ */
+function checkRemnantOrigin(
+  value: { kind?: PieceKind; remnantOrigin?: RemnantOrigin | null },
+  ctx: z.RefinementCtx,
+): void {
+  if (value.kind === 'remnant' && !value.remnantOrigin) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['remnantOrigin'],
+      message: 'Say where this remnant came from',
+    })
+  }
+  if (value.kind === 'slab' && value.remnantOrigin) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['remnantOrigin'],
+      message: 'A slab is bought, not cut from something — leave the origin empty',
+    })
+  }
+}
+
+/** The raw field set. Refined into create/update below; `.partial()` refuses a refined object. */
+const pieceFields = z.object({
   kind: pieceKindSchema,
+  /**
+   * Explicitly nullable rather than defaulted: "this is a slab, so there is no origin" is a
+   * statement the caller should have to make. A default would also split the schema's input and
+   * output types, which react-hook-form resolves against as one.
+   */
+  remnantOrigin: remnantOriginSchema.nullable(),
   status: pieceStatusSchema,
   parentId: z.string().nullable(),
   materialId: z.string().nullable(),
@@ -47,9 +86,15 @@ export const createPieceSchema = z.object({
   notes: z.string().max(2000, 'Keep it under 2000 characters'),
 })
 
+export const createPieceSchema = pieceFields.superRefine(checkRemnantOrigin)
 export type CreatePieceInput = z.infer<typeof createPieceSchema>
 
-export const updatePieceSchema = createPieceSchema.partial()
+/**
+ * A PATCH body. `.partial()` on the object *before* the refinement, then re-refined, because a
+ * patch that changes only `location` carries no `kind` to check — but one that flips a slab to a
+ * remnant must still be made to supply an origin.
+ */
+export const updatePieceSchema = pieceFields.partial().superRefine(checkRemnantOrigin)
 export type UpdatePieceInput = z.infer<typeof updatePieceSchema>
 
 export const materialInputSchema = z.object({
@@ -62,6 +107,8 @@ export type MaterialInput = z.infer<typeof materialInputSchema>
 
 export const registerSchema = z.object({
   name: z.string().min(1, 'Name is required').max(120),
+  /** The shop this account belongs to. Registering creates the org and makes you its owner. */
+  orgName: z.string().min(1, 'Company name is required').max(120),
   email: z.email('Enter a valid email address').max(200),
   password: z.string().min(8, 'Use at least 8 characters').max(200),
 })
@@ -83,6 +130,7 @@ export const pieceRecordSchema = z.object({
   rootId: z.string(),
   depth: z.number().int().min(0),
   kind: pieceKindSchema,
+  remnantOrigin: remnantOriginSchema.nullable(),
   status: pieceStatusSchema,
   materialId: z.string().nullable(),
   lengthMm: z.number().int().positive(),
@@ -107,14 +155,12 @@ export const materialRecordSchema = z.object({
 })
 
 export const countersSchema = z.object({
-  block: z.number().int().min(0),
   slab: z.number().int().min(0),
   remnant: z.number().int().min(0),
-  finished: z.number().int().min(0),
 })
 
 export const backupSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   exportedAt: z.string(),
   pieces: z.array(pieceRecordSchema),
   materials: z.array(materialRecordSchema),

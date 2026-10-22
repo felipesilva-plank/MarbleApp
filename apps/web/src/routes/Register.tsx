@@ -20,7 +20,7 @@ export function Register() {
     formState: { errors, isSubmitting },
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: '', email: '', password: '' },
+    defaultValues: { name: '', orgName: '', email: '', password: '' },
   })
 
   if (!loading && user) return <Navigate to="/" replace />
@@ -38,7 +38,7 @@ export function Register() {
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Set up access to your yard's inventory."
+      subtitle="Registering sets up your shop. You will be its owner."
       footer={
         <>
           Already registered?{' '}
@@ -51,8 +51,17 @@ export function Register() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {error ? <Alert>{error}</Alert> : null}
 
-        <Field label="Name" error={errors.name?.message} htmlFor="name">
+        <Field label="Your name" error={errors.name?.message} htmlFor="name">
           <Input id="name" autoComplete="name" autoFocus {...register('name')} />
+        </Field>
+
+        <Field
+          label="Company"
+          error={errors.orgName?.message}
+          htmlFor="orgName"
+          hint="Everything you register belongs to this shop, and to nobody else."
+        >
+          <Input id="orgName" autoComplete="organization" {...register('orgName')} />
         </Field>
 
         <Field label="Email" error={errors.email?.message} htmlFor="email">

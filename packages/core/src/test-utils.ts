@@ -1,4 +1,4 @@
-import type { Piece, PieceKind } from './types'
+import type { Piece, PieceKind } from './types.ts'
 
 /** Test-only factory. Not exported from the package index. */
 export function makePiece(overrides: Partial<Piece> & { id: string }): Piece {
@@ -10,6 +10,7 @@ export function makePiece(overrides: Partial<Piece> & { id: string }): Piece {
     rootId: overrides.id,
     depth: 0,
     kind,
+    remnantOrigin: kind === 'remnant' ? 'offcut' : null,
     status: 'available',
     materialId: null,
     lengthMm: 1000,
@@ -26,22 +27,22 @@ export function makePiece(overrides: Partial<Piece> & { id: string }): Piece {
 }
 
 /**
- * Shared fixture:
+ * Shared fixture — a slab cut twice, one of whose offcuts was itself re-cut:
  *
- *   blk (0)
- *   ├── slb1 (1)
- *   │   ├── rmn1 (2)
- *   │   └── rmn2 (2)
- *   └── slb2 (1)
- *   orphan (0)
+ *   slab (0)
+ *   ├── cutA (1)
+ *   │   ├── cutA1 (2)
+ *   │   └── cutA2 (2)
+ *   └── cutB (1)
+ *   orphan (0)   remnant whose source was never recorded
  */
 export function fixtureTree(): Piece[] {
   return [
-    makePiece({ id: 'blk', kind: 'block', rootId: 'blk', depth: 0, createdAt: '2026-01-01T00:00:00.000Z' }),
-    makePiece({ id: 'slb1', kind: 'slab', parentId: 'blk', rootId: 'blk', depth: 1, createdAt: '2026-01-02T00:00:00.000Z' }),
-    makePiece({ id: 'slb2', kind: 'slab', parentId: 'blk', rootId: 'blk', depth: 1, createdAt: '2026-01-03T00:00:00.000Z' }),
-    makePiece({ id: 'rmn1', kind: 'remnant', parentId: 'slb1', rootId: 'blk', depth: 2, createdAt: '2026-01-04T00:00:00.000Z' }),
-    makePiece({ id: 'rmn2', kind: 'remnant', parentId: 'slb1', rootId: 'blk', depth: 2, createdAt: '2026-01-05T00:00:00.000Z' }),
-    makePiece({ id: 'orphan', kind: 'remnant', rootId: 'orphan', depth: 0, createdAt: '2026-01-06T00:00:00.000Z' }),
+    makePiece({ id: 'slab', kind: 'slab', rootId: 'slab', depth: 0, createdAt: '2026-01-01T00:00:00.000Z' }),
+    makePiece({ id: 'cutA', parentId: 'slab', rootId: 'slab', depth: 1, createdAt: '2026-01-02T00:00:00.000Z' }),
+    makePiece({ id: 'cutB', parentId: 'slab', rootId: 'slab', depth: 1, createdAt: '2026-01-03T00:00:00.000Z' }),
+    makePiece({ id: 'cutA1', parentId: 'cutA', rootId: 'slab', depth: 2, createdAt: '2026-01-04T00:00:00.000Z' }),
+    makePiece({ id: 'cutA2', parentId: 'cutA', rootId: 'slab', depth: 2, createdAt: '2026-01-05T00:00:00.000Z' }),
+    makePiece({ id: 'orphan', rootId: 'orphan', depth: 0, createdAt: '2026-01-06T00:00:00.000Z' }),
   ]
 }

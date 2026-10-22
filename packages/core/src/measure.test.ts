@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { areaM2, consumptionSummary, formatArea, formatDimensions, volumeM3 } from './measure'
-import { makePiece } from './test-utils'
+import { areaM2, consumptionSummary, formatArea, formatDimensions, volumeM3 } from './measure.ts'
+import { makePiece } from './test-utils.ts'
 
 describe('areaM2 / volumeM3', () => {
   it('converts square millimetres to square metres', () => {

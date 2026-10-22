@@ -47,7 +47,7 @@ export function AuthShell({
         <div className="mt-4 text-center text-sm text-stone-600">{footer}</div>
 
         <p className="mt-6 text-center text-xs text-stone-400">
-          Demo build. Accounts and inventory are stored in this browser only — not on a server.
+          Your inventory is stored on our servers and is visible only to your shop.
         </p>
       </div>
     </div>

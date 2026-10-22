@@ -1,15 +1,16 @@
 ---
 name: api-route
-description: Add a new data operation end-to-end through the port contract - interface signature, local adapter implementation, TanStack Query hook, and integration test. Use when the app needs to read or write something it currently cannot, or when the user types /api-route.
+description: Add a new data operation end-to-end - zod schema, API service and route, port signature, HTTP adapter, TanStack Query hook, and integration test. Use when the app needs to read or write something it currently cannot, or when the user types /api-route.
 ---
 
 # Add a data operation
 
-This app has no HTTP server yet, so "adding an API route" means **adding a method to the port
-contract**. `apps/web/src/data/ports.ts` is deliberately shaped like the REST API that will replace
-it, so a method added correctly here becomes an endpoint later with no change above the seam.
+An operation is a real HTTP endpoint in `apps/api` plus the method on the port that reaches it.
+The work runs **server-first**: the rule lives in a service, the route is thin, and the web side
+is a transport call.
 
-Read `apps/web/src/data/ports.ts` in full before writing anything. Its header comment is the spec.
+Read `apps/web/src/data/ports.ts` and `apps/api/src/routes/pieces.ts` before writing anything.
+The header comment in `ports.ts` is the spec, and it lists the endpoint for every method.
 
 ## Arguments
 
@@ -39,29 +40,40 @@ Read `apps/web/src/data/ports.ts` in full before writing anything. Its header co
    inferred type. This same schema object will validate the API request body — do not write
    validation inline in the adapter or duplicate it in a form.
 
-4. **Implement in `apps/web/src/data/local/<repo>Repo.ts`:**
-   - Parse the input through its schema at the top of the method.
+4. **Implement the rule in `apps/api/src/services/<repo>.ts`:**
+   - Take `orgId` as the first argument and scope every query by it. Never read an org id from a
+     request body — that is a tenant-isolation hole.
+   - Parse the input through its schema at the top of the function.
    - Throw `DomainError(code, message)` for anything the user can act on. Messages are shown
      verbatim, so write them for a fabricator: "That would make the piece its own ancestor.", not
      "Cycle detected in graph".
    - Lineage changes go through `recomputeSubtree` from `@marble/core`. Never assign `rootId` or
-     `depth` by hand.
-   - Writes go through `writeJson` from `./db` so quota errors surface as `DomainError('QUOTA')`.
+     `depth` by hand, and never reimplement the walk in SQL.
+   - Anything that touches more than one row goes inside `db().$transaction`.
 
-5. **Add the hook** in `apps/web/src/hooks/use<Repo>.ts`:
+5. **Expose it in `apps/api/src/routes/<repo>.ts`.** Routes are thin: parse the request, call the
+   service, shape the response. No business logic in a handler.
+
+6. **Implement the transport in `apps/web/src/data/http/<repo>Repo.ts`.** `apiGet` / `apiSend`
+   from `./client`, and nothing else — no rules, no fallbacks, no local recomputation.
+
+7. **Add the hook** in `apps/web/src/hooks/use<Repo>.ts`:
    - Query → `useQuery` with a key from the existing `pieceKeys` / `materialKeys` object. Add the
      key there, do not inline an array literal.
    - Mutation → `useMutation` with `onSuccess: invalidate`. Invalidate the whole `pieces` tree,
      not one detail key: lineage edits ripple across many rows.
 
-6. **Test in `apps/web/src/data/local/local.integration.test.ts`.** Exercise the real adapter — no
-   mocks. Cover the happy path *and* the `DomainError` path; the error branch is what the future
-   API will get wrong.
+8. **Test in `apps/api/src/api.integration.test.ts`.** Drive the real HTTP app against the real
+   database — no mocks. Cover the happy path, the `DomainError` path, and the case where another
+   shop asks for the same thing. The error branch and the tenant boundary are what get broken.
 
-7. **Verify.** `npm run typecheck && npm test`.
+   If the operation shows up on a screen, teach `apps/web/src/test/fakeApi.ts` to serve it too,
+   or the smoke test for that route will 404.
+
+9. **Verify.** `npm run typecheck && npm test`.
 
 ## Do not
 
 - Add a method that only one component uses and that could be a `useMemo` over `list()`.
-- Return a raw store object. Ports return domain entities, deep-cloned, never live references.
+- Put the rule in the HTTP adapter. A rule enforced only in the browser is not enforced.
 - Skip the schema because "the form already validates it". The form is not the contract.

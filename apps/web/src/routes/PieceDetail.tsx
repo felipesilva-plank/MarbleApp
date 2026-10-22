@@ -24,7 +24,7 @@ import {
 } from '../hooks/usePieces'
 import { useMaterialMap } from '../hooks/useMaterials'
 import { formatDate } from '../lib/format'
-import { KindBadge, OrphanBadge, StatusBadge } from '../components/badges'
+import { KindBadge, OrphanBadge, RemnantOriginBadge, StatusBadge } from '../components/badges'
 import { ParentPicker } from '../components/ParentPicker'
 import { PhotoInput } from '../components/PhotoInput'
 import { PieceThumb } from '../components/PieceThumb'
@@ -140,6 +140,7 @@ export function PieceDetail() {
           <span className="flex flex-wrap items-center gap-3">
             {piece.code}
             <KindBadge kind={piece.kind} />
+            {piece.remnantOrigin ? <RemnantOriginBadge origin={piece.remnantOrigin} /> : null}
             {isUnlinked(piece) ? <OrphanBadge /> : null}
           </span>
         }

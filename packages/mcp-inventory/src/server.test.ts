@@ -116,10 +116,24 @@ describe('marble-inventory MCP server', () => {
       name: 'query',
       arguments: { sql: 'SELECT kind, COUNT(*) AS n FROM pieces GROUP BY kind ORDER BY kind' },
     })
+    // The fixture is a v1 export carrying a block. `loadBackup` migrates it to a slab on the way
+    // in, so the snapshot only ever contains the two kinds the schema allows.
     expect(JSON.parse(textOf(result))).toEqual([
-      { kind: 'block', n: 1 },
       { kind: 'remnant', n: 2 },
-      { kind: 'slab', n: 1 },
+      { kind: 'slab', n: 2 },
+    ])
+  })
+
+  it('carries the remnant origin through the snapshot', async () => {
+    const result = await client.callTool({
+      name: 'query',
+      arguments: {
+        sql: 'SELECT remnant_origin, COUNT(*) AS n FROM pieces GROUP BY remnant_origin ORDER BY 1',
+      },
+    })
+    expect(JSON.parse(textOf(result))).toEqual([
+      { remnant_origin: null, n: 2 },
+      { remnant_origin: 'offcut', n: 2 },
     ])
   })
 
@@ -206,7 +220,7 @@ describe('loadBackup', () => {
   it('inserts parents before children despite input order', () => {
     const db = openDb(':memory:')
     createSchema(db)
-    // The fixture lists the block first; reverse it so a naive loader would violate the FK.
+    // The fixture lists the root first; reverse it so a naive loader would violate the FK.
     const parsed = JSON.parse(backupJson())
     parsed.pieces.reverse()
     expect(() => loadBackup(db, JSON.stringify(parsed))).not.toThrow()

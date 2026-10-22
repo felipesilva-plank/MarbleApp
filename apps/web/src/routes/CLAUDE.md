@@ -8,7 +8,7 @@ layer allowed to do all three.
 A route may: call hooks, read and write URL search params, own local UI state, compose components,
 and render loading and error states.
 
-A route may **not**: import from `data/local/`, contain domain logic that `packages/core` should
+A route may **not**: import from `data/http/`, contain domain logic that `packages/core` should
 own, or reimplement a primitive from `components/ui.tsx`.
 
 ## URL state over component state

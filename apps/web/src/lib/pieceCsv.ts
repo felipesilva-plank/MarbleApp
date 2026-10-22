@@ -1,4 +1,10 @@
-import { PIECE_KIND_LABELS, PIECE_STATUS_LABELS, areaM2, isUnlinked } from '@marble/core'
+import {
+  PIECE_KIND_LABELS,
+  PIECE_STATUS_LABELS,
+  REMNANT_ORIGIN_LABELS,
+  areaM2,
+  isUnlinked,
+} from '@marble/core'
 import type { CsvColumn, Material, Piece } from '@marble/core'
 
 /**
@@ -13,6 +19,10 @@ export function pieceCsvColumns(
   return [
     { header: 'Code', value: (p) => p.code },
     { header: 'Type', value: (p) => PIECE_KIND_LABELS[p.kind] },
+    {
+      header: 'Remnant origin',
+      value: (p) => (p.remnantOrigin ? REMNANT_ORIGIN_LABELS[p.remnantOrigin] : ''),
+    },
     { header: 'Status', value: (p) => PIECE_STATUS_LABELS[p.status] },
     { header: 'Material', value: (p) => materialName(p.materialId) },
     { header: 'Length (mm)', value: (p) => p.lengthMm },

@@ -49,6 +49,6 @@ the review will send back anything that reimplements them.
 ## Do not
 
 - Add a prop "for later". Add it when the second caller needs it.
-- Reach into `data/local/` — components talk to hooks, hooks talk to ports.
+- Reach into `data/http/` — components talk to hooks, hooks talk to ports.
 - Add a new dependency to render something. This app has React, Tailwind and nothing else on the
   view layer, on purpose.

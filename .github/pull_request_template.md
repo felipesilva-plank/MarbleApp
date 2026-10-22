@@ -18,15 +18,18 @@
 - [ ] `npm run build` passes
 - [ ] Preview deploy checked in a browser
 - [ ] New route added to the smoke suite (or n/a)
+- [ ] New server-side rule covered in `apps/api/src/api.integration.test.ts` (or n/a)
 
 ## Architecture check
 
 <!-- The rules in CLAUDE.md that typecheck cannot enforce. Tick or explain. -->
 
-- [ ] Nothing above `data/` imports from `data/local/`
+- [ ] Nothing above `data/` imports from `data/http/`
 - [ ] `packages/core` still has zero framework/DOM/node imports
 - [ ] Lineage fields (`rootId`, `depth`) are derived, not hand-set
 - [ ] Validation lives in `packages/core/src/schemas.ts`, not duplicated in a form
+- [ ] Every new query in `apps/api` is scoped by `orgId` from the session, never from a body
+- [ ] Business rules live in `apps/api`, not only in the browser
 
 ## Review
 

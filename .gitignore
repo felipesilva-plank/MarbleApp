@@ -155,3 +155,6 @@ packages/mcp-inventory/*.db
 
 # Notes written by the CLI's save_note tool
 .marble-notes.json
+
+# Local photo store, used when object storage is not configured
+.data/

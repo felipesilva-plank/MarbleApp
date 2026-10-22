@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { toCsv, toCsvFile, UTF8_BOM } from './csv'
-import type { CsvColumn } from './csv'
+import { toCsv, toCsvFile, UTF8_BOM } from './csv.ts'
+import type { CsvColumn } from './csv.ts'
 
 interface Row {
   code: string
